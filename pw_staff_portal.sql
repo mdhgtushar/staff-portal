@@ -1,11 +1,11 @@
 -- phpMyAdmin SQL Dump
--- version 5.2.0
+-- version 5.1.1
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Sep 11, 2023 at 07:30 AM
--- Server version: 10.4.27-MariaDB
--- PHP Version: 8.2.0
+-- Generation Time: Sep 12, 2023 at 12:57 AM
+-- Server version: 10.4.22-MariaDB
+-- PHP Version: 7.4.27
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -31,7 +31,7 @@ CREATE TABLE `caches` (
   `name` varchar(250) NOT NULL,
   `data` mediumtext NOT NULL,
   `expires` datetime NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `caches`
@@ -55,8 +55,8 @@ INSERT INTO `caches` (`name`, `data`, `expires`) VALUES
 
 CREATE TABLE `fieldgroups` (
   `id` int(10) UNSIGNED NOT NULL,
-  `name` varchar(250) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+  `name` varchar(250) CHARACTER SET ascii NOT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `fieldgroups`
@@ -100,7 +100,7 @@ CREATE TABLE `fieldgroups_fields` (
   `fields_id` int(10) UNSIGNED NOT NULL DEFAULT 0,
   `sort` int(11) UNSIGNED NOT NULL DEFAULT 0,
   `data` text DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `fieldgroups_fields`
@@ -205,12 +205,12 @@ INSERT INTO `fieldgroups_fields` (`fieldgroups_id`, `fields_id`, `sort`, `data`)
 
 CREATE TABLE `fields` (
   `id` int(10) UNSIGNED NOT NULL,
-  `type` varchar(128) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
-  `name` varchar(250) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+  `type` varchar(128) CHARACTER SET ascii NOT NULL,
+  `name` varchar(250) CHARACTER SET ascii NOT NULL,
   `flags` int(11) NOT NULL DEFAULT 0,
   `label` varchar(250) NOT NULL DEFAULT '',
   `data` text NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `fields`
@@ -260,7 +260,7 @@ CREATE TABLE `fieldtype_options` (
   `title` text DEFAULT NULL,
   `value` varchar(250) DEFAULT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `fieldtype_options`
@@ -300,18 +300,7 @@ CREATE TABLE `field_ac_input` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(10) UNSIGNED NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
-
---
--- Dumping data for table `field_ac_input`
---
-
-INSERT INTO `field_ac_input` (`pages_id`, `data`, `sort`) VALUES
-(1148, 1, 0),
-(1151, 1, 0),
-(1155, 1, 0),
-(1157, 1, 0),
-(1159, 1, 0);
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -322,7 +311,7 @@ INSERT INTO `field_ac_input` (`pages_id`, `data`, `sort`) VALUES
 CREATE TABLE `field_admin_theme` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(11) NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_admin_theme`
@@ -341,18 +330,7 @@ CREATE TABLE `field_backup_per_device` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(10) UNSIGNED NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
-
---
--- Dumping data for table `field_backup_per_device`
---
-
-INSERT INTO `field_backup_per_device` (`pages_id`, `data`, `sort`) VALUES
-(1148, 1, 0),
-(1151, 1, 0),
-(1155, 1, 0),
-(1157, 1, 0),
-(1159, 2, 0);
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -364,18 +342,7 @@ CREATE TABLE `field_backup_per_gb` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(10) UNSIGNED NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
-
---
--- Dumping data for table `field_backup_per_gb`
---
-
-INSERT INTO `field_backup_per_gb` (`pages_id`, `data`, `sort`) VALUES
-(1148, 1, 0),
-(1151, 1, 0),
-(1155, 1, 0),
-(1157, 1, 0),
-(1159, 2, 0);
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -387,18 +354,7 @@ CREATE TABLE `field_backup_vps` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(10) UNSIGNED NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
-
---
--- Dumping data for table `field_backup_vps`
---
-
-INSERT INTO `field_backup_vps` (`pages_id`, `data`, `sort`) VALUES
-(1148, 1, 0),
-(1151, 1, 0),
-(1155, 1, 0),
-(1157, 2, 0),
-(1159, 1, 0);
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -410,18 +366,7 @@ CREATE TABLE `field_bandwidth_physical` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(10) UNSIGNED NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
-
---
--- Dumping data for table `field_bandwidth_physical`
---
-
-INSERT INTO `field_bandwidth_physical` (`pages_id`, `data`, `sort`) VALUES
-(1148, 1, 0),
-(1151, 1, 0),
-(1155, 1, 0),
-(1157, 1, 0),
-(1159, 2, 0);
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -433,18 +378,7 @@ CREATE TABLE `field_bandwidth_process_hypers` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(10) UNSIGNED NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
-
---
--- Dumping data for table `field_bandwidth_process_hypers`
---
-
-INSERT INTO `field_bandwidth_process_hypers` (`pages_id`, `data`, `sort`) VALUES
-(1148, 1, 0),
-(1151, 1, 0),
-(1155, 1, 0),
-(1157, 1, 0),
-(1159, 2, 0);
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -456,18 +390,7 @@ CREATE TABLE `field_bandwidth_vps` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(10) UNSIGNED NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
-
---
--- Dumping data for table `field_bandwidth_vps`
---
-
-INSERT INTO `field_bandwidth_vps` (`pages_id`, `data`, `sort`) VALUES
-(1148, 1, 0),
-(1151, 1, 0),
-(1155, 2, 0),
-(1157, 1, 0),
-(1159, 2, 0);
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -479,18 +402,7 @@ CREATE TABLE `field_cancelation_requests` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(10) UNSIGNED NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
-
---
--- Dumping data for table `field_cancelation_requests`
---
-
-INSERT INTO `field_cancelation_requests` (`pages_id`, `data`, `sort`) VALUES
-(1148, 1, 0),
-(1151, 1, 0),
-(1155, 1, 0),
-(1157, 1, 0),
-(1159, 1, 0);
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -502,7 +414,7 @@ CREATE TABLE `field_course_category` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(11) NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_course_category`
@@ -526,24 +438,15 @@ INSERT INTO `field_course_category` (`pages_id`, `data`, `sort`) VALUES
 CREATE TABLE `field_date` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` datetime NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_date`
 --
 
 INSERT INTO `field_date` (`pages_id`, `data`) VALUES
-(1147, '2023-10-13 00:00:00'),
-(1146, '2023-09-20 00:00:00'),
 (1084, '2023-09-02 00:00:00'),
-(1148, '2023-09-07 08:16:03'),
-(1149, '2023-09-21 00:00:00'),
-(1151, '2023-09-07 08:49:54'),
-(1154, '2023-09-29 00:00:00'),
-(1155, '2023-09-07 13:49:29'),
-(1157, '2023-09-07 13:50:44'),
-(1158, '2023-09-30 00:00:00'),
-(1159, '2023-09-07 15:03:23');
+(1166, '2023-09-12 00:00:00');
 
 -- --------------------------------------------------------
 
@@ -554,7 +457,7 @@ INSERT INTO `field_date` (`pages_id`, `data`) VALUES
 CREATE TABLE `field_email` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` varchar(250) NOT NULL DEFAULT ''
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_email`
@@ -574,7 +477,7 @@ CREATE TABLE `field_employee_name` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(11) NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_employee_name`
@@ -592,7 +495,7 @@ INSERT INTO `field_employee_name` (`pages_id`, `data`, `sort`) VALUES
 CREATE TABLE `field_form_edit_fields` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` text NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -604,7 +507,7 @@ CREATE TABLE `field_form_visibility` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(10) UNSIGNED NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_form_visibility`
@@ -624,7 +527,7 @@ CREATE TABLE `field_instructor` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(11) NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_instructor`
@@ -644,7 +547,7 @@ INSERT INTO `field_instructor` (`pages_id`, `data`, `sort`) VALUES
 CREATE TABLE `field_is_featured` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` tinyint(4) NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_is_featured`
@@ -664,7 +567,7 @@ INSERT INTO `field_is_featured` (`pages_id`, `data`) VALUES
 CREATE TABLE `field_page_body` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` mediumtext NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_page_body`
@@ -702,7 +605,7 @@ CREATE TABLE `field_page_images` (
   `width` int(11) DEFAULT NULL,
   `height` int(11) DEFAULT NULL,
   `ratio` decimal(4,2) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_page_images`
@@ -724,7 +627,7 @@ CREATE TABLE `field_pass` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` char(40) NOT NULL,
   `salt` char(32) NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=ascii;
 
 --
 -- Dumping data for table `field_pass`
@@ -746,7 +649,7 @@ CREATE TABLE `field_permissions` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(11) NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_permissions`
@@ -773,7 +676,7 @@ INSERT INTO `field_permissions` (`pages_id`, `data`, `sort`) VALUES
 CREATE TABLE `field_process` (
   `pages_id` int(11) NOT NULL DEFAULT 0,
   `data` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_process`
@@ -825,7 +728,7 @@ CREATE TABLE `field_profile_photo` (
   `width` int(11) DEFAULT NULL,
   `height` int(11) DEFAULT NULL,
   `ratio` decimal(4,2) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_profile_photo`
@@ -846,18 +749,7 @@ CREATE TABLE `field_raid_health_hypers` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(10) UNSIGNED NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
-
---
--- Dumping data for table `field_raid_health_hypers`
---
-
-INSERT INTO `field_raid_health_hypers` (`pages_id`, `data`, `sort`) VALUES
-(1148, 1, 0),
-(1151, 1, 0),
-(1155, 2, 0),
-(1157, 2, 0),
-(1159, 2, 0);
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -869,7 +761,7 @@ CREATE TABLE `field_roles` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(11) NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_roles`
@@ -892,18 +784,7 @@ CREATE TABLE `field_room_alert` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(10) UNSIGNED NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
-
---
--- Dumping data for table `field_room_alert`
---
-
-INSERT INTO `field_room_alert` (`pages_id`, `data`, `sort`) VALUES
-(1148, 1, 0),
-(1151, 1, 0),
-(1155, 1, 0),
-(1157, 1, 0),
-(1159, 1, 0);
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -914,7 +795,7 @@ INSERT INTO `field_room_alert` (`pages_id`, `data`, `sort`) VALUES
 CREATE TABLE `field_short_description` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` text NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_short_description`
@@ -922,31 +803,22 @@ CREATE TABLE `field_short_description` (
 
 INSERT INTO `field_short_description` (`pages_id`, `data`) VALUES
 (1084, 'If you change Generator today, Please choose the date and write \"Done\" and save!'),
-(1154, 'Done'),
 (1020, 'Please complete your daily task to visit this page!'),
-(1158, 'Done!'),
 (1018, 'This is a simple hero unit, a simple jumbotron-style component for calling extra attention to featured content or information.'),
 (1015, 'This is a simple hero unit, a simple jumbotron-style component for calling extra attention to featured content or information.'),
 (1024, 'You will find NashirNet all course in one place.'),
-(1159, 'ddnknknkgnf'),
 (1026, 'Donec sed odio dui. Etiam porta sem malesuada magna mollis euismod. Nullam id dolor id nibh ultricies vehicula ut id elit. Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Praesent commodo cursus magna.'),
 (1027, 'Donec sed odio dui. Etiam porta sem malesuada magna mollis euismod. Nullam id dolor id nibh ultricies vehicula ut id elit. Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Praesent commodo cursus magna.'),
 (1028, 'Donec sed odio dui. Etiam porta sem malesuada magna mollis euismod. Nullam id dolor id nibh ultricies vehicula ut id elit. Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Praesent commodo cursus magna.'),
 (1030, 'Donec sed odio dui. Etiam porta sem malesuada magna mollis euismod. Nullam id dolor id nibh ultricies vehicula ut id elit'),
 (1043, 'Please see the form and fill it up what you have done today!'),
-(1155, 'Done!'),
-(1157, 'Done2!'),
 (1031, 'Donec sed odio dui. Etiam porta sem malesuada magna mollis euismod. Nullam id dolor id nibh ultricies vehicula ut id elit. Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Praesent commodo cursus magna.'),
 (1033, 'Donec sed odio dui. Etiam porta sem malesuada magna mollis euismod. Nullam id dolor id nibh ultricies vehicula ut id elit. Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Praesent commodo cursus magna.'),
 (1032, 'This is a simple hero unit, a simple jumbotron-style component for calling extra attention to featured content or information'),
 (1038, 'Management Course Management Course Management Course Management Course'),
 (1037, 'Networking Course  Networking Course  Networking Course  Networking Course  Networking Course'),
 (1035, 'Basic Course Basic Course Basic Course Basic Course Basic Course Basic Course Basic Course'),
-(1036, 'Advanced Course Advanced Course Advanced Course Advanced Course Advanced Course'),
-(1146, 'abc'),
-(1148, 'wwwwwwwwww'),
-(1149, 'Done'),
-(1151, 'xxxx');
+(1036, 'Advanced Course Advanced Course Advanced Course Advanced Course Advanced Course');
 
 -- --------------------------------------------------------
 
@@ -968,7 +840,7 @@ CREATE TABLE `field_thumbnail` (
   `width` int(11) DEFAULT NULL,
   `height` int(11) DEFAULT NULL,
   `ratio` decimal(4,2) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_thumbnail`
@@ -996,7 +868,7 @@ INSERT INTO `field_thumbnail` (`pages_id`, `data`, `sort`, `description`, `modif
 CREATE TABLE `field_title` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` text NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_title`
@@ -1073,28 +945,16 @@ INSERT INTO `field_title` (`pages_id`, `data`) VALUES
 (1129, 'Generator Portal List'),
 (1127, 'Entry of Daily Duties'),
 (1126, 'Form Page'),
-(1145, 'admin'),
-(1146, 'admin  -  06-09-2023 20:59:00'),
 (1122, 'Emergency Numbers'),
-(1123, 'admin'),
 (1084, 'Generator Portal'),
-(1147, 'admin  -  06-09-2023 20:59:08'),
-(1148, 'admin  -  07-09-2023 08:16:03'),
-(1149, 'admin  -  07-09-2023 08:19:51'),
-(1150, 'staff_test'),
-(1151, 'staff_test  -  07-09-2023 08:49:54'),
-(1153, 'staff_test_2'),
-(1154, 'staff_test_2  -  07-09-2023 13:43:21'),
-(1155, 'admin  -  07-09-2023 13:49:29'),
 (1156, 'staff_test_2'),
-(1157, 'staff_test_2  -  07-09-2023 13:50:44'),
-(1158, 'admin  -  07-09-2023 14:56:14'),
-(1159, 'admin  -  07-09-2023 15:03:23'),
 (1160, 'Form Builder'),
 (1161, 'Access Form Builder admin page'),
 (1162, 'Add new or import Form Builder forms'),
 (1163, 'Forms'),
-(1164, 'sss');
+(1164, 'sss'),
+(1165, 'admin'),
+(1166, 'View Daily Duties');
 
 -- --------------------------------------------------------
 
@@ -1106,29 +966,16 @@ CREATE TABLE `field_user_id` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `data` int(11) NOT NULL,
   `sort` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `field_user_id`
 --
 
 INSERT INTO `field_user_id` (`pages_id`, `data`, `sort`) VALUES
-(1123, 41, 0),
-(1145, 41, 0),
-(1146, 41, 0),
-(1147, 41, 0),
-(1148, 41, 0),
-(1149, 41, 0),
-(1155, 41, 0),
-(1158, 41, 0),
-(1159, 41, 0),
+(1165, 41, 0),
 (1084, 1053, 0),
-(1150, 1053, 0),
-(1151, 1053, 0),
-(1153, 1152, 0),
-(1154, 1152, 0),
-(1156, 1152, 0),
-(1157, 1152, 0);
+(1156, 1152, 0);
 
 -- --------------------------------------------------------
 
@@ -1140,14 +987,16 @@ CREATE TABLE `forms` (
   `id` int(10) UNSIGNED NOT NULL,
   `name` varchar(128) NOT NULL,
   `data` mediumtext NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `forms`
 --
 
 INSERT INTO `forms` (`id`, `name`, `data`) VALUES
-(1, 'test_form', '{\"required\":false,\"columnWidth\":0,\"action\":\".\\/\",\"method\":\"post\",\"roles\":{\"form-submit\":[\"guest\"],\"form-list\":[],\"form-edit\":[],\"form-delete\":[],\"entries-list\":[],\"entries-edit\":[],\"entries-delete\":[],\"entries-page\":[],\"entries-resend\":[]},\"flags\":0,\"pluginActions\":[],\"framework\":\"Basic\",\"allowPreset\":0,\"skipSessionKey\":0,\"useCookies\":0,\"submitText\":\"Submit\",\"successMessage\":\"Thank you, your form has been submitted.\",\"errorMessage\":\"One or more errors prevented submission of the form. Please correct and try again.\",\"mobilePx\":0,\"frBasic_noLoad\":[],\"frBasic_cssURL\":\"\\/site\\/modules\\/FormBuilder\\/frameworks\\/basic\\/main.css\",\"frBasic_itemContent\":[\"description\",\"out\",\"error\",\"notes\"],\"listFields\":[],\"entryDays\":0,\"emailSubject\":\"Form Submission\",\"emailFiles\":0,\"responderSubject\":\"Auto-Response\",\"saveFlags\":1,\"children\":{\"checkbox_test\":{\"type\":\"Checkbox\",\"label\":\"Checkbox Test\",\"description\":\"This is a test Formbuilder\",\"required\":false,\"columnWidth\":0,\"collapsed\":\"0\",\"checkedValue\":\"1\"},\"date_time\":{\"type\":\"Datetime\",\"label\":\"Date Time\",\"description\":\"This is test Check form Builder\",\"columnWidth\":0,\"collapsed\":\"0\",\"inputType\":\"text\",\"htmlType\":\"date\",\"dateSelectFormat\":\"yMd\",\"yearFrom\":1923,\"yearTo\":2043,\"yearLock\":0,\"datepicker\":\"0\",\"timeInputSelect\":0,\"dateInputFormat\":\"Y-m-d\",\"size\":25}}}');
+(1, 'test_form', '{\"required\":false,\"columnWidth\":0,\"action\":\".\\/\",\"method\":\"post\",\"roles\":{\"form-submit\":[\"guest\"],\"form-list\":[],\"form-edit\":[],\"form-delete\":[],\"entries-list\":[],\"entries-edit\":[],\"entries-delete\":[],\"entries-page\":[],\"entries-resend\":[]},\"flags\":0,\"pluginActions\":[],\"framework\":\"Basic\",\"allowPreset\":0,\"skipSessionKey\":0,\"useCookies\":0,\"submitText\":\"Submit\",\"successMessage\":\"Thank you, your form has been submitted.\",\"errorMessage\":\"One or more errors prevented submission of the form. Please correct and try again.\",\"mobilePx\":0,\"frBasic_noLoad\":[],\"frBasic_cssURL\":\"\\/site\\/modules\\/FormBuilder\\/frameworks\\/basic\\/main.css\",\"frBasic_itemContent\":[\"description\",\"out\",\"error\",\"notes\"],\"listFields\":[],\"entryDays\":0,\"emailSubject\":\"Form Submission\",\"emailFiles\":0,\"responderSubject\":\"Auto-Response\",\"saveFlags\":1,\"children\":{\"checkbox_test\":{\"type\":\"Checkbox\",\"label\":\"Checkbox Test\",\"description\":\"This is a test Formbuilder\",\"required\":false,\"columnWidth\":0,\"collapsed\":\"0\",\"checkedValue\":\"1\"},\"date_time\":{\"type\":\"Datetime\",\"label\":\"Date Time\",\"description\":\"This is test Check form Builder\",\"columnWidth\":0,\"collapsed\":\"0\",\"inputType\":\"text\",\"htmlType\":\"date\",\"dateSelectFormat\":\"yMd\",\"yearFrom\":1923,\"yearTo\":2043,\"yearLock\":0,\"datepicker\":\"0\",\"timeInputSelect\":0,\"dateInputFormat\":\"Y-m-d\",\"size\":25}}}'),
+(2, 'generator_portal', '{\"required\":false,\"columnWidth\":0,\"action\":\".\\/\",\"method\":\"post\",\"roles\":{\"form-submit\":[\"guest\"],\"form-list\":[],\"form-edit\":[],\"form-delete\":[],\"entries-list\":[],\"entries-edit\":[],\"entries-delete\":[],\"entries-page\":[],\"entries-resend\":[]},\"flags\":0,\"pluginActions\":[],\"framework\":\"Basic\",\"allowPreset\":0,\"skipSessionKey\":0,\"useCookies\":0,\"submitText\":\"Submit\",\"successMessage\":\"Thank you, your form has been submitted.\",\"errorMessage\":\"One or more errors prevented submission of the form. Please correct and try again.\",\"mobilePx\":0,\"frBasic_noLoad\":[],\"frBasic_cssURL\":\"\\/site\\/modules\\/FormBuilder\\/frameworks\\/basic\\/main.css\",\"frBasic_itemContent\":[\"description\",\"out\",\"error\",\"notes\"],\"listFields\":[],\"entryDays\":0,\"emailSubject\":\"Form Submission\",\"emailFiles\":0,\"responderSubject\":\"Auto-Response\",\"saveFlags\":1,\"children\":{\"date\":{\"type\":\"Datetime\",\"label\":\"date\",\"required\":false,\"columnWidth\":0,\"collapsed\":\"0\",\"inputType\":\"text\",\"htmlType\":\"date\",\"dateSelectFormat\":\"yMd\",\"yearFrom\":1923,\"yearTo\":2043,\"yearLock\":0,\"datepicker\":\"0\",\"timeInputSelect\":0,\"dateInputFormat\":\"Y-m-d\",\"size\":25},\"short_description\":{\"type\":\"Textarea\",\"label\":\"short_description\",\"required\":false,\"columnWidth\":0,\"collapsed\":\"0\",\"minlength\":0,\"maxlength\":0,\"showCount\":\"0\",\"rows\":5},\"user_id\":{\"type\":\"Page\",\"label\":\"user_id\",\"columnWidth\":0,\"collapsed\":\"0\",\"inputfield\":\"InputfieldSelect\",\"parent_id\":0,\"template_ids\":[],\"labelFieldName\":\"title\",\"template_id\":\"3\"}}}'),
+(3, 'daily_duties', '{\"required\":false,\"columnWidth\":0,\"action\":\".\\/\",\"method\":\"post\",\"roles\":{\"form-submit\":[\"guest\"],\"form-list\":[],\"form-edit\":[],\"form-delete\":[],\"entries-list\":[],\"entries-edit\":[],\"entries-delete\":[],\"entries-page\":[],\"entries-resend\":[]},\"flags\":0,\"pluginActions\":[],\"framework\":\"Basic\",\"allowPreset\":0,\"skipSessionKey\":0,\"useCookies\":0,\"submitText\":\"Submit\",\"successMessage\":\"Thank you, your form has been submitted.\",\"errorMessage\":\"One or more errors prevented submission of the form. Please correct and try again.\",\"mobilePx\":0,\"frBasic_noLoad\":[],\"frBasic_cssURL\":\"\\/site\\/modules\\/FormBuilder\\/frameworks\\/basic\\/main.css\",\"frBasic_itemContent\":[\"description\",\"out\",\"error\",\"notes\"],\"listFields\":[],\"entryDays\":0,\"emailSubject\":\"Form Submission\",\"emailFiles\":0,\"responderSubject\":\"Auto-Response\",\"saveFlags\":1,\"children\":{\"ac_check\":{\"type\":\"Select\",\"label\":\"AC Check\",\"required\":false,\"columnWidth\":0,\"collapsed\":\"0\",\"options\":\"=\\nOption 1\\nOption 2\\nOption 3\"},\"ac_issue\":{\"type\":\"Textarea\",\"label\":\"Ac Issue\",\"required\":false,\"columnWidth\":0,\"collapsed\":\"0\",\"minlength\":0,\"maxlength\":2048,\"showCount\":\"0\",\"size\":0},\"ac_solution\":{\"type\":\"Text\",\"label\":\"AC Solution\",\"columnWidth\":0,\"collapsed\":\"0\",\"minlength\":0,\"maxlength\":2048,\"showCount\":\"0\",\"size\":0}}}');
 
 -- --------------------------------------------------------
 
@@ -1163,7 +1012,7 @@ CREATE TABLE `forms_entries` (
   `data` mediumtext NOT NULL,
   `created` datetime NOT NULL,
   `modified` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `forms_entries`
@@ -1171,7 +1020,12 @@ CREATE TABLE `forms_entries` (
 
 INSERT INTO `forms_entries` (`id`, `forms_id`, `flags`, `str`, `data`, `created`, `modified`) VALUES
 (1, 1, 0, '', '{\"checkbox_test\":\"1\",\"date_time\":false}', '2023-09-10 11:01:25', '2023-09-10 08:01:25'),
-(2, 1, 0, '', '{\"checkbox_test\":\"1\",\"date_time\":false}', '2023-09-10 12:34:36', '2023-09-10 09:34:36');
+(2, 1, 0, '', '{\"checkbox_test\":\"1\",\"date_time\":false}', '2023-09-10 12:34:36', '2023-09-10 09:34:36'),
+(3, 1, 0, '', '{\"checkbox_test\":\"1\",\"date_time\":\"\"}', '2023-09-11 23:23:37', '2023-09-11 20:23:37'),
+(4, 1, 0, '', '{\"checkbox_test\":\"\",\"date_time\":false}', '2023-09-11 23:29:22', '2023-09-11 20:29:22'),
+(5, 2, 0, '', '{\"date\":1127422800,\"short_description\":\"This is short desc\",\"user_id\":\"1053\"}', '2023-09-11 23:46:52', '2023-09-11 20:46:52'),
+(6, 2, 0, '', '{\"date\":1124053200,\"short_description\":\"Dicta non maiores cu\",\"user_id\":\"1152\"}', '2023-09-12 00:25:48', '2023-09-11 21:25:48'),
+(9, 3, 0, '', '{\"ac_check\":\"Option 3\",\"ac_issue\":\"Consequatur ad corrupti sed accusantium assumenda temporibus saepe\",\"ac_solution\":\"Reprehenderit facilis voluptas cillum laboris culpa dolor nostrum odit quam ipsum eveniet elit esse magni dolore\"}', '2023-09-12 01:18:46', '2023-09-11 22:18:46');
 
 -- --------------------------------------------------------
 
@@ -1181,11 +1035,11 @@ INSERT INTO `forms_entries` (`id`, `forms_id`, `flags`, `str`, `data`, `created`
 
 CREATE TABLE `modules` (
   `id` int(10) UNSIGNED NOT NULL,
-  `class` varchar(128) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+  `class` varchar(128) CHARACTER SET ascii NOT NULL,
   `flags` int(11) NOT NULL DEFAULT 0,
   `data` mediumtext NOT NULL,
   `created` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `modules`
@@ -1296,7 +1150,7 @@ INSERT INTO `modules` (`id`, `class`, `flags`, `data`, `created`) VALUES
 (176, 'PageFrontEdit', 2, '{\"inlineEditFields\":[],\"inlineLimitPage\":1,\"buttonLocation\":\"auto\",\"buttonType\":\"auto\"}', '2023-08-22 22:44:54'),
 (177, 'LoginRegister', 0, '{\"features\":[\"login\",\"profile\"],\"registerFields\":[\"email\",\"pass\"],\"profileFields\":[\"pass\",\"email\"],\"registerRoles\":[\"login-register:1045\"]}', '2023-09-01 01:49:53'),
 (178, 'ProcessForgotPassword', 1, '', '2023-09-01 01:52:48'),
-(179, 'FormBuilder', 3, '{\"lastMaint\":1694331277,\"schemaVersion\":2,\"licenseKey\":\"PWFB4.per8500.d6dfd8d58100528665a51d684acfc16f332fe59f\",\"embedFields\":[],\"embedTag\":\"form-builder\",\"fromEmail\":\"arif@nashirnet.net\",\"mailer\":\"\",\"inputfieldClasses\":[\"AsmSelect\",\"Checkbox\",\"Checkboxes\",\"Datetime\",\"Email\",\"Fieldset\",\"Float\",\"FormBuilderFile\",\"Hidden\",\"Integer\",\"Page\",\"Radios\",\"Select\",\"SelectMultiple\",\"Text\",\"Textarea\",\"URL\"],\"useRoles\":1,\"akismetKey\":\"\",\"csvDelimiter\":\",\",\"csvUseBOM\":\"\",\"filesPath\":\"{config.paths.cache}form-builder\\/\",\"embedCode\":\"<iframe src=\'{httpUrl}\' id=\'FormBuilderViewport_{name}\' class=\'FormBuilderViewport\' data-form=\'{name}\' title=\'{name}\' frameborder=\'0\' allowTransparency=\'true\' style=\'width: 100%; height: 900px;\'><\\/iframe>\",\"markup_list\":\"<div {attrs}>{out}\\n<\\/div>\",\"markup_item\":\"<div {attrs}>{out}\\n<\\/div>\",\"markup_item_label\":\"<label class=\'ui-widget-header\' for=\'{for}\'>{out}<\\/label>\",\"markup_item_content\":\"<div class=\'ui-widget-content\'>{out}<\\/div>\",\"markup_item_error\":\"<p><span class=\'ui-state-error\'>{out}<\\/span><\\/p>\",\"markup_item_description\":\"<p class=\'description\'>{out}<\\/p>\",\"markup_success\":\"<p class=\'ui-state-highlight\'>{out}<\\/p>\",\"markup_error\":\"<p class=\'ui-state-error\'>{out}<\\/p>\",\"classes_form\":\"\",\"classes_list\":\"Inputfields\",\"classes_list_clearfix\":\"ui-helper-clearfix\",\"classes_item\":\"Inputfield Inputfield_{name} ui-widget {class}\",\"classes_item_required\":\"InputfieldStateRequired\",\"classes_item_error\":\"InputfieldStateError ui-state-error\",\"classes_item_collapsed\":\"InputfieldStateCollapsed\",\"classes_item_column_width\":\"InputfieldColumnWidth\",\"classes_item_column_width_first\":\"InputfieldColumnWidthFirst\"}', '2023-09-10 07:34:36'),
+(179, 'FormBuilder', 3, '{\"lastMaint\":1694463700,\"schemaVersion\":2,\"licenseKey\":\"PWFB4.per8500.d6dfd8d58100528665a51d684acfc16f332fe59f\",\"embedFields\":[],\"embedTag\":\"form-builder\",\"fromEmail\":\"arif@nashirnet.net\",\"mailer\":\"\",\"inputfieldClasses\":[\"AsmSelect\",\"Checkbox\",\"Checkboxes\",\"Datetime\",\"Email\",\"Fieldset\",\"Float\",\"FormBuilderFile\",\"Hidden\",\"Integer\",\"Page\",\"Radios\",\"Select\",\"SelectMultiple\",\"Text\",\"Textarea\",\"URL\"],\"useRoles\":1,\"akismetKey\":\"\",\"csvDelimiter\":\",\",\"csvUseBOM\":\"\",\"filesPath\":\"{config.paths.cache}form-builder\\/\",\"embedCode\":\"<iframe src=\'{httpUrl}\' id=\'FormBuilderViewport_{name}\' class=\'FormBuilderViewport\' data-form=\'{name}\' title=\'{name}\' frameborder=\'0\' allowTransparency=\'true\' style=\'width: 100%; height: 900px;\'><\\/iframe>\",\"markup_list\":\"<div {attrs}>{out}\\n<\\/div>\",\"markup_item\":\"<div {attrs}>{out}\\n<\\/div>\",\"markup_item_label\":\"<label class=\'ui-widget-header\' for=\'{for}\'>{out}<\\/label>\",\"markup_item_content\":\"<div class=\'ui-widget-content\'>{out}<\\/div>\",\"markup_item_error\":\"<p><span class=\'ui-state-error\'>{out}<\\/span><\\/p>\",\"markup_item_description\":\"<p class=\'description\'>{out}<\\/p>\",\"markup_success\":\"<p class=\'ui-state-highlight\'>{out}<\\/p>\",\"markup_error\":\"<p class=\'ui-state-error\'>{out}<\\/p>\",\"classes_form\":\"\",\"classes_list\":\"Inputfields\",\"classes_list_clearfix\":\"ui-helper-clearfix\",\"classes_item\":\"Inputfield Inputfield_{name} ui-widget {class}\",\"classes_item_required\":\"InputfieldStateRequired\",\"classes_item_error\":\"InputfieldStateError ui-state-error\",\"classes_item_collapsed\":\"InputfieldStateCollapsed\",\"classes_item_column_width\":\"InputfieldColumnWidth\",\"classes_item_column_width_first\":\"InputfieldColumnWidthFirst\"}', '2023-09-10 07:34:36'),
 (180, 'ProcessFormBuilder', 1, '', '2023-09-10 07:34:36'),
 (181, 'InputfieldFormBuilderFile', 0, '', '2023-09-10 07:34:36');
 
@@ -1310,7 +1164,7 @@ CREATE TABLE `pages` (
   `id` int(10) UNSIGNED NOT NULL,
   `parent_id` int(11) UNSIGNED NOT NULL DEFAULT 0,
   `templates_id` int(11) UNSIGNED NOT NULL DEFAULT 0,
-  `name` varchar(128) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+  `name` varchar(128) CHARACTER SET ascii NOT NULL,
   `status` int(10) UNSIGNED NOT NULL DEFAULT 1,
   `modified` timestamp NOT NULL DEFAULT current_timestamp(),
   `modified_users_id` int(10) UNSIGNED NOT NULL DEFAULT 2,
@@ -1318,7 +1172,7 @@ CREATE TABLE `pages` (
   `created_users_id` int(10) UNSIGNED NOT NULL DEFAULT 2,
   `published` datetime DEFAULT NULL,
   `sort` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `pages`
@@ -1398,32 +1252,20 @@ INSERT INTO `pages` (`id`, `parent_id`, `templates_id`, `name`, `status`, `modif
 (1045, 30, 4, 'login-register', 1, '2023-09-01 01:49:53', 41, '2023-09-01 01:49:53', 41, '2023-09-01 07:49:53', 2),
 (1046, 1044, 58, 'login', 1, '2023-09-01 02:02:36', 41, '2023-09-01 02:02:19', 41, '2023-09-01 08:02:22', 0),
 (1053, 29, 3, 'staff_test', 1, '2023-09-07 06:47:43', 41, '2023-09-01 04:29:41', 41, '2023-09-01 10:31:33', 2),
-(1145, 1084, 61, 'admin', 1, '2023-09-06 18:58:55', 41, '2023-09-06 18:58:55', 41, '2023-09-07 00:58:55', 0),
-(1146, 1145, 62, 'admin-06-09-2023-20-59-00', 1, '2023-09-06 18:59:00', 41, '2023-09-06 18:59:00', 41, '2023-09-07 00:59:00', 0),
-(1147, 1145, 62, 'admin-06-09-2023-20-59-08', 1, '2023-09-06 18:59:08', 41, '2023-09-06 18:59:08', 41, '2023-09-07 00:59:08', 1),
 (1122, 1, 63, 'emergency-numbers', 1, '2023-09-07 11:12:20', 41, '2023-09-03 09:17:27', 41, '2023-09-03 15:19:21', 8),
-(1123, 1043, 59, 'admin', 1, '2023-09-03 09:27:33', 41, '2023-09-03 09:27:33', 41, '2023-09-03 15:27:33', 0),
 (1126, 1, 29, 'form-page', 1, '2023-09-06 18:05:19', 41, '2023-09-06 18:05:03', 41, '2023-09-07 00:05:07', 5),
 (1127, 1126, 64, 'daily-duties-list', 1, '2023-09-07 08:21:58', 41, '2023-09-06 18:05:41', 41, '2023-09-07 00:05:44', 0),
 (1129, 1126, 65, 'generator-portal-list', 1, '2023-09-06 18:39:43', 41, '2023-09-06 18:39:30', 41, '2023-09-07 00:39:41', 1),
 (1084, 1020, 61, 'generator-portal', 1, '2023-09-07 11:03:24', 41, '2023-09-02 14:09:15', 41, '2023-09-02 20:09:40', 4),
-(1148, 1123, 60, 'admin-07-09-2023-08-16-03', 1, '2023-09-07 06:16:03', 41, '2023-09-07 06:16:03', 41, '2023-09-07 09:16:03', 0),
-(1149, 1145, 62, 'admin-07-09-2023-08-19-51', 1, '2023-09-07 06:19:51', 41, '2023-09-07 06:19:51', 41, '2023-09-07 09:19:51', 2),
-(1150, 1043, 59, 'staff_test', 1, '2023-09-07 06:48:23', 1053, '2023-09-07 06:48:23', 1053, '2023-09-07 09:48:23', 1),
-(1151, 1150, 60, 'staff_test-07-09-2023-08-49-54', 1, '2023-09-07 06:49:54', 1053, '2023-09-07 06:49:54', 1053, '2023-09-07 09:49:54', 0),
 (1152, 29, 3, 'staff_test_2', 1, '2023-09-07 10:42:17', 41, '2023-09-07 10:40:46', 41, '2023-09-07 13:42:17', 3),
-(1153, 1084, 61, 'staff_test_2', 1, '2023-09-07 10:43:02', 1152, '2023-09-07 10:43:02', 1152, '2023-09-07 13:43:02', 1),
-(1154, 1153, 62, 'staff_test_2-07-09-2023-13-43-21', 1, '2023-09-07 10:43:21', 1152, '2023-09-07 10:43:21', 1152, '2023-09-07 13:43:21', 0),
-(1155, 1123, 60, 'admin-07-09-2023-13-49-29', 1, '2023-09-07 10:49:29', 41, '2023-09-07 10:49:29', 41, '2023-09-07 13:49:29', 1),
 (1156, 1043, 59, 'staff_test_2', 1, '2023-09-07 10:50:11', 1152, '2023-09-07 10:50:11', 1152, '2023-09-07 13:50:11', 2),
-(1157, 1153, 60, 'staff_test_2-07-09-2023-13-50-44', 1, '2023-09-07 10:50:44', 1152, '2023-09-07 10:50:44', 1152, '2023-09-07 13:50:44', 1),
-(1158, 1145, 62, 'admin-07-09-2023-14-56-14', 1, '2023-09-07 11:56:14', 41, '2023-09-07 11:56:14', 41, '2023-09-07 14:56:14', 3),
-(1159, 1123, 60, 'admin-07-09-2023-15-03-23', 1, '2023-09-07 12:03:23', 41, '2023-09-07 12:03:23', 41, '2023-09-07 15:03:23', 2),
 (1160, 1, 66, 'form-builder', 1025, '2023-09-10 07:34:36', 41, '2023-09-10 07:34:36', 41, '2023-09-10 10:34:36', 8),
 (1161, 31, 5, 'form-builder', 1, '2023-09-10 07:34:36', 41, '2023-09-10 07:34:36', 41, '2023-09-10 10:34:36', 14),
 (1162, 31, 5, 'form-builder-add', 1, '2023-09-10 07:34:36', 41, '2023-09-10 07:34:36', 41, '2023-09-10 10:34:36', 15),
 (1163, 22, 2, 'form-builder', 1, '2023-09-10 07:34:36', 41, '2023-09-10 07:34:36', 41, '2023-09-10 10:34:36', 3),
-(1164, 1043, 59, 'sss', 2049, '2023-09-10 07:48:16', 41, '2023-09-10 07:48:16', 41, NULL, 3);
+(1164, 1043, 59, 'sss', 2049, '2023-09-10 07:48:16', 41, '2023-09-10 07:48:16', 41, NULL, 3),
+(1165, 1084, 61, 'admin', 1, '2023-09-11 21:25:43', 41, '2023-09-11 21:25:43', 41, '2023-09-12 03:25:43', 0),
+(1166, 1043, 60, 'view-daily-duties', 1, '2023-09-11 21:44:36', 41, '2023-09-11 21:44:32', 41, '2023-09-12 03:44:36', 2);
 
 -- --------------------------------------------------------
 
@@ -1435,7 +1277,7 @@ CREATE TABLE `pages_access` (
   `pages_id` int(11) NOT NULL,
   `templates_id` int(11) NOT NULL,
   `ts` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `pages_access`
@@ -1463,7 +1305,6 @@ INSERT INTO `pages_access` (`pages_id`, `templates_id`, `ts`) VALUES
 (1018, 1, '2023-08-17 22:29:51'),
 (1016, 1, '2023-08-22 21:06:04'),
 (1020, 1, '2023-08-17 22:42:55'),
-(1146, 1, '2023-09-06 18:59:00'),
 (1024, 1, '2023-08-18 14:19:50'),
 (1025, 1, '2023-08-18 14:32:34'),
 (1026, 1, '2023-08-18 14:35:48'),
@@ -1488,28 +1329,17 @@ INSERT INTO `pages_access` (`pages_id`, `templates_id`, `ts`) VALUES
 (1045, 2, '2023-09-01 01:49:53'),
 (1046, 1, '2023-09-01 02:02:19'),
 (1127, 1, '2023-09-06 18:05:41'),
-(1123, 1, '2023-09-03 09:27:33'),
-(1147, 1, '2023-09-06 18:59:08'),
 (1126, 1, '2023-09-06 18:05:03'),
 (1122, 1, '2023-09-03 09:17:27'),
 (1129, 1, '2023-09-06 18:39:30'),
-(1145, 1, '2023-09-06 18:58:55'),
 (1084, 1, '2023-09-02 14:09:15'),
-(1148, 1, '2023-09-07 06:16:03'),
-(1149, 1, '2023-09-07 06:19:51'),
-(1150, 1, '2023-09-07 06:48:23'),
-(1151, 1, '2023-09-07 06:49:54'),
-(1153, 1, '2023-09-07 10:43:02'),
-(1154, 1, '2023-09-07 10:43:21'),
-(1155, 1, '2023-09-07 10:49:29'),
 (1156, 1, '2023-09-07 10:50:11'),
-(1157, 1, '2023-09-07 10:50:44'),
-(1158, 1, '2023-09-07 11:56:14'),
-(1159, 1, '2023-09-07 12:03:23'),
 (1160, 1, '2023-09-10 07:34:36'),
 (1161, 2, '2023-09-10 07:34:36'),
 (1162, 2, '2023-09-10 07:34:36'),
-(1164, 1, '2023-09-10 07:48:16');
+(1164, 1, '2023-09-10 07:48:16'),
+(1165, 1, '2023-09-11 21:25:43'),
+(1166, 1, '2023-09-11 21:44:32');
 
 -- --------------------------------------------------------
 
@@ -1520,7 +1350,7 @@ INSERT INTO `pages_access` (`pages_id`, `templates_id`, `ts`) VALUES
 CREATE TABLE `pages_parents` (
   `pages_id` int(10) UNSIGNED NOT NULL,
   `parents_id` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `pages_parents`
@@ -1554,15 +1384,7 @@ INSERT INTO `pages_parents` (`pages_id`, `parents_id`) VALUES
 (1033, 1029),
 (1034, 1024),
 (1043, 1020),
-(1084, 1020),
-(1123, 1020),
-(1123, 1043),
-(1145, 1020),
-(1145, 1084),
-(1150, 1020),
-(1150, 1043),
-(1153, 1020),
-(1153, 1084);
+(1084, 1020);
 
 -- --------------------------------------------------------
 
@@ -1573,7 +1395,7 @@ INSERT INTO `pages_parents` (`pages_id`, `parents_id`) VALUES
 CREATE TABLE `pages_sortfields` (
   `pages_id` int(10) UNSIGNED NOT NULL DEFAULT 0,
   `sortfield` varchar(20) NOT NULL DEFAULT ''
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -1587,7 +1409,7 @@ CREATE TABLE `process_forgot_password` (
   `token` char(32) NOT NULL,
   `ts` int(10) UNSIGNED NOT NULL,
   `ip` varchar(45) NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=ascii;
 
 -- --------------------------------------------------------
 
@@ -1599,14 +1421,14 @@ CREATE TABLE `session_login_throttle` (
   `name` varchar(128) NOT NULL,
   `attempts` int(10) UNSIGNED NOT NULL DEFAULT 0,
   `last_attempt` int(10) UNSIGNED NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `session_login_throttle`
 --
 
 INSERT INTO `session_login_throttle` (`name`, `attempts`, `last_attempt`) VALUES
-('admin', 1, 1694330222);
+('admin', 1, 1694463705);
 
 -- --------------------------------------------------------
 
@@ -1616,43 +1438,43 @@ INSERT INTO `session_login_throttle` (`name`, `attempts`, `last_attempt`) VALUES
 
 CREATE TABLE `templates` (
   `id` int(10) UNSIGNED NOT NULL,
-  `name` varchar(250) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+  `name` varchar(250) CHARACTER SET ascii NOT NULL,
   `fieldgroups_id` int(10) UNSIGNED NOT NULL DEFAULT 0,
   `flags` int(11) NOT NULL DEFAULT 0,
   `cache_time` mediumint(9) NOT NULL DEFAULT 0,
   `data` text NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 --
 -- Dumping data for table `templates`
 --
 
 INSERT INTO `templates` (`id`, `name`, `fieldgroups_id`, `flags`, `cache_time`, `data`) VALUES
-(2, 'admin', 2, 8, 0, '{\"useRoles\":1,\"parentTemplates\":[2],\"allowPageNum\":1,\"redirectLogin\":23,\"slashUrls\":1,\"noGlobal\":1,\"compile\":3,\"modified\":1693547420,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
+(2, 'admin', 2, 8, 0, '{\"useRoles\":1,\"parentTemplates\":[2],\"allowPageNum\":1,\"redirectLogin\":23,\"slashUrls\":1,\"noGlobal\":1,\"compile\":3,\"modified\":1694463522,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
 (3, 'user', 3, 8, 0, '{\"useRoles\":1,\"noChildren\":1,\"parentTemplates\":[2],\"slashUrls\":1,\"pageClass\":\"User\",\"noGlobal\":1,\"noMove\":1,\"noTrash\":1,\"noSettings\":1,\"noChangeTemplate\":1,\"compile\":0,\"nameContentTab\":1,\"modified\":1693534544,\"_lazy\":1}'),
 (4, 'role', 4, 8, 0, '{\"noChildren\":1,\"parentTemplates\":[2],\"slashUrls\":1,\"pageClass\":\"Role\",\"noGlobal\":1,\"noMove\":1,\"noTrash\":1,\"noSettings\":1,\"noChangeTemplate\":1,\"nameContentTab\":1}'),
 (5, 'permission', 5, 8, 0, '{\"noChildren\":1,\"parentTemplates\":[2],\"slashUrls\":1,\"guestSearchable\":1,\"pageClass\":\"Permission\",\"noGlobal\":1,\"noMove\":1,\"noTrash\":1,\"noSettings\":1,\"noChangeTemplate\":1,\"nameContentTab\":1}'),
-(1, 'home', 1, 0, 0, '{\"useRoles\":1,\"noParents\":1,\"slashUrls\":1,\"compile\":3,\"modified\":1694084061,\"ns\":\"ProcessWire\",\"_lazy\":1,\"roles\":[37]}'),
-(29, 'basic-page', 83, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1692378668,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
-(57, 'profile', 111, 0, 0, '{\"slashUrls\":1,\"compile\":3,\"modified\":1693552850,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
-(56, 'daily_duties_form', 110, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694088063,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
-(54, 'course_category', 108, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1693549096,\"ns\":\"ProcessWire\",\"_lazy\":\"*\"}'),
-(47, 'forms', 101, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1693548804,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
-(48, 'form_page', 102, 0, 0, '{\"slashUrls\":1,\"altFilename\":\"form_page\",\"compile\":0,\"modified\":1693547912,\"ns\":\"ProcessWire\",\"_lazy\":\"*\"}'),
-(49, 'courses', 103, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1693697064,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
-(50, 'instructor', 104, 0, 0, '{\"slashUrls\":1,\"altFilename\":\"instructor\",\"compile\":0,\"modified\":1693549120,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
-(51, 'course_page', 105, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1693547930,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
-(52, 'all-courses', 106, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1693549102,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
-(53, 'course_material', 107, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1693547968,\"ns\":\"ProcessWire\",\"_lazy\":\"*\"}'),
-(58, 'login', 112, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1693548292,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
-(60, 'daily_duties_data', 114, 0, 0, '{\"slashUrls\":1,\"altFilename\":\"daily_duties_data\",\"compile\":0,\"modified\":1694074545,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
+(1, 'home', 1, 0, 0, '{\"useRoles\":1,\"noParents\":1,\"slashUrls\":1,\"compile\":3,\"modified\":1694463523,\"ns\":\"ProcessWire\",\"_lazy\":1,\"roles\":[37]}'),
+(29, 'basic-page', 83, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694463522,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
+(57, 'profile', 111, 0, 0, '{\"slashUrls\":1,\"compile\":3,\"modified\":1694463523,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
+(56, 'daily_duties_form', 110, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694471068,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
+(54, 'course_category', 108, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694463522,\"ns\":\"ProcessWire\",\"_lazy\":\"*\"}'),
+(47, 'forms', 101, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694463522,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
+(48, 'form_page', 102, 0, 0, '{\"slashUrls\":1,\"altFilename\":\"form_page\",\"compile\":0,\"modified\":1694463522,\"ns\":\"ProcessWire\",\"_lazy\":\"*\"}'),
+(49, 'courses', 103, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694463522,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
+(50, 'instructor', 104, 0, 0, '{\"slashUrls\":1,\"altFilename\":\"instructor\",\"compile\":0,\"modified\":1694463523,\"ns\":\"ProcessWire\",\"_lazy\":\"*\"}'),
+(51, 'course_page', 105, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694463522,\"ns\":\"ProcessWire\",\"_lazy\":\"*\"}'),
+(52, 'all-courses', 106, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694463522,\"ns\":\"ProcessWire\",\"_lazy\":\"*\"}'),
+(53, 'course_material', 107, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694463522,\"ns\":\"ProcessWire\",\"_lazy\":\"*\"}'),
+(58, 'login', 112, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694463523,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
+(60, 'daily_duties_data', 114, 0, 0, '{\"slashUrls\":1,\"altFilename\":\"daily_duties_data\",\"compile\":0,\"modified\":1694470647,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
 (59, 'form_submit_user', 113, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1693542423,\"_lazy\":1}'),
-(61, 'generator_portal_form', 115, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694338448,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
+(61, 'generator_portal_form', 115, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694471047,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
 (62, 'generator_portal_data', 116, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1693662345,\"_lazy\":1}'),
-(63, 'emergency_numbers', 117, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694086904,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
-(64, 'daily_duties_list', 118, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694084780,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
-(65, 'generator_portal_list', 119, 0, 0, '{\"slashUrls\":1,\"compile\":3,\"modified\":1694069910,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
-(66, 'form-builder', 120, 8, 0, '{\"noParents\":1,\"urlSegments\":1,\"slashUrls\":1,\"noGlobal\":1,\"compile\":3,\"modified\":1694331725,\"ns\":\"ProcessWire\",\"_lazy\":1}');
+(63, 'emergency_numbers', 117, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694463522,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
+(64, 'daily_duties_list', 118, 0, 0, '{\"slashUrls\":1,\"compile\":0,\"modified\":1694470958,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
+(65, 'generator_portal_list', 119, 0, 0, '{\"slashUrls\":1,\"compile\":3,\"modified\":1694468017,\"ns\":\"ProcessWire\",\"_lazy\":1}'),
+(66, 'form-builder', 120, 8, 0, '{\"noParents\":1,\"urlSegments\":1,\"slashUrls\":1,\"noGlobal\":1,\"compile\":3,\"modified\":1694463522,\"ns\":\"ProcessWire\",\"_lazy\":1}');
 
 --
 -- Indexes for dumped tables
@@ -2036,13 +1858,13 @@ ALTER TABLE `fields`
 -- AUTO_INCREMENT for table `forms`
 --
 ALTER TABLE `forms`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `forms_entries`
 --
 ALTER TABLE `forms_entries`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `modules`
@@ -2054,7 +1876,7 @@ ALTER TABLE `modules`
 -- AUTO_INCREMENT for table `pages`
 --
 ALTER TABLE `pages`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1165;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1167;
 
 --
 -- AUTO_INCREMENT for table `templates`

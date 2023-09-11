@@ -1,0 +1,327 @@
+<?php namespace ProcessWire;
+
+/**
+ * ProcessWire Form Builder Page Break Inputfield
+ *
+ * Copyright (C) 2019 by Ryan Cramer Design, LLC
+ *
+ * PLEASE DO NOT DISTRIBUTE
+ *
+ */
+
+require_once(dirname(__FILE__) . '/InputfieldFormBuilder.php');
+
+/**
+ *
+ * @property bool|int $showSummary
+ *
+ */
+class InputfieldFormBuilderPageBreak extends InputfieldFormBuilder implements InputfieldFormBuilderInterface {
+
+	/**
+	 * Return information about this module
+	 *
+	 */
+	public static function getModuleInfo() {
+		return array(
+			'title' => 'Page Break (for FormBuilder)',
+			'version' => 1,
+			'summary' => 'Enables you to create separate paginations of a form in FormBuilder.',
+			'requires' => 'FormBuilder',
+		);
+	}
+
+	/**
+	 * Keeps track of when we've added hooks
+	 * 
+	 * @var array
+	 * 
+	 */
+	protected static $hooked = array();
+
+	/**
+	 * Are we in render value mode?
+	 * 
+	 * @var bool
+	 * 
+	 */
+	protected $renderValue = false;
+
+	/**
+	 * Construct
+	 * 
+	 */
+	public function __construct() {
+		parent::__construct();
+		$this->attr('value', null);
+		if(defined(__NAMESPACE__ . '\Inputfield::skipLabelMarkup')) {
+			$this->skipLabel = constant(__NAMESPACE__ . '\Inputfield::skipLabelMarkup');
+		} else {
+			$this->skipLabel = Inputfield::skipLabelHeader;
+		}
+		$this->textFormat = Inputfield::textFormatMarkdown;
+		$this->set('showSummary', false);
+	}
+
+	/**
+	 * Set property
+	 * 
+	 * @param string $key
+	 * @param mixed $value
+	 * @return Inputfield|WireData
+	 * 
+	 */
+	public function set($key, $value) {
+		if($key === 'processor' && is_object($value) && FormBuilder::allowPageNav) {
+			/** @var FormBuilderProcessor $processor */
+			$processor = $value;
+			if($processor->fbForm->showNav) { // && !isset(self::$hooked[$processor->formName])) {
+				$processor->addHookBefore('renderReady', $this, 'hookFormRenderReady');
+				self::$hooked[$processor->formName] = true;
+			}
+		}
+		return parent::set($key, $value);
+	}
+	
+	/**
+	 * Render 
+	 * 
+	 * @return string
+	 * 
+	 */
+	public function ___render() {
+		$out = '';
+		$this->notes = '';
+		
+		$language = $this->wire('user')->language;
+		$label = $this->get("label$language|label");
+		$description = $this->get("description$language|description");
+		$hLevel = (int) $this->processor->fbForm->hLevel;
+		
+		if($hLevel) {
+			$out .= "<h$hLevel>" . $this->entityEncode($label) . "</h$hLevel>";
+		}
+		
+		if($description) {
+			$this->description = '';
+			$out .= $this->entityEncode($description, Inputfield::textFormatMarkdown);
+		}
+		
+		if(FormBuilder::allowSummaryPage && $this->showSummary && !$this->renderValue) {
+			$out .= $this->renderSummary();
+		}
+		
+		return $out;
+	}
+
+	/**
+	 * Summary pagination (for future use)
+	 * 
+	 * @return string
+	 * @throws WireException
+	 * @throws WirePermissionException
+	 * 
+	 */
+	public function renderSummary() {
+		
+		$out = "<table class='pwfb-summary'>";
+		$processor = $this->processor;
+		$sanitizer = $this->wire('sanitizer');
+		$inputfields = new InputfieldWrapper();
+		$formArray = $processor->getFbForm()->getArray();
+		$inputfields = $processor->maker()->arrayToInputfields($formArray['children'], -1, 1, $inputfields, true);
+		$entry = $processor->getEntry();
+		$entryID = isset($entry['id']) ? (int) $entry['id'] : 0;
+		$thisName = $this->attr('name');
+		$allErrors = array();
+		$noShows = array();
+		$pageNum = 1;
+		$lastParent = null;
+		$cnt = 0;
+		
+		/** @var InputfieldButton $button */
+		$button = $this->wire('modules')->get('InputfieldButton');
+		$button->attr('value', $this->_('Edit'));
+		
+		for($n = 1; $n <= $processor->maker()->getNumPaginations(); $n++) {
+			if(isset($entry["_errors$n"])) {
+				$allErrors = array_merge($allErrors, $entry["_errors$n"]);
+			}
+			if(isset($entry["_noshows$n"])) {
+				foreach($entry["_noshows$n"] as $name) {
+					$noShows[$name] = $name;
+				}
+			}
+		}
+		
+		foreach($inputfields->getAll() as $f) {
+			$cnt++;
+			
+			/** @var Inputfield $f */
+			if($f instanceof InputfieldHidden) continue;
+			//if($f instanceof InputfieldWrapper) continue;
+
+			$name = $f->attr('name');
+			$label = $f->label;
+			
+			if($name === $thisName || isset($noShows[$name])) continue;
+			
+			if(isset($entry[$name])) {
+				$processor->maker()->populateInputfield($f, $entry[$name], $entryID);
+			}
+			
+			if($f instanceof InputfieldFormBuilderPageBreak) {
+				if($cnt > 1) $pageNum++;
+				$href = $processor->getFormUrl(array('pageNum' => $pageNum));
+				$buttonOut = "<a href='$href'>" . $this->_('Click to edit') . "</a>";
+				$out .= "<tr class='pwfb-summary-pagebreak'>";
+				$out .= "<th class='pwfb-summary-edit'>$buttonOut</th><td>" . $f->renderValue() . "</td>";
+				
+			} else {
+				$errors = array();
+				foreach($allErrors as $error) {
+					$landmark = "$label - ";
+					if(strpos($error, $landmark) !== 0) continue;
+					$error = str_replace($landmark, '', $error);
+					$errors[] = $error;
+				}
+				$th = $sanitizer->entities($label);
+				$td = $inputfields->renderInputfield($f, true); 
+				if(count($errors)) {
+					if($td === '&nbsp;') $td = '';
+					foreach($errors as $error) {
+						$td .= "<div class='pwfb-summary-error'>" . $sanitizer->entities($error) . "</div>";
+					}
+				}
+
+				$parent = $f->getParent();
+				if(wireInstanceOf($parent, 'InputfieldFormBuilderForm') && $parent !== $lastParent && $parent->getSetting('labelType') > 1) {
+					$parent->renderReady($this, true);
+					$out .= "<tr class='pwfb-summary-form'><th>&nbsp;</th><td>$parent->prependMarkup</td></tr><tr>";
+					$lastParent = $parent;
+				} else {
+					$out .= "<tr>";
+				}
+						
+				$out .= "<th>$th</th><td>$td</td>";
+			}
+			
+			$out .= "</tr>";
+		}
+
+		$out .= "</table>";
+		
+		return $out;
+	}
+
+	/**
+	 * Render ready hook
+	 * 
+	 * - Adds navigation select at top of pagination (when enabled in form settings)
+	 * 
+	 * @param HookEvent $event
+	 * 
+	 */
+	public function hookFormRenderReady(HookEvent $event) {
+		$form = $event->arguments(0);
+		$this->addPaginationNavigation($form);
+	}
+
+	/**
+	 * Add pagination navigation to the form
+	 * 
+	 * @param InputfieldForm $form
+	 * 
+	 */
+	protected function addPaginationNavigation(InputfieldForm $form) {
+		
+		$pageBreaks = $this->processor->fbForm->getPageBreakFields();
+		$formName = $this->processor->formName;
+		$thisLabel = $this->getSetting('label');
+		$showNav = (int) $this->processor->fbForm->showNav;
+		$hLevel = (int) $this->processor->fbForm->hLevel;
+
+		/** @var InputfieldSelect $select */
+		$select = $this->wire('modules')->get('InputfieldSelect');
+		$select->attr('name', "{$formName}_submit_jump");
+		$select->skipLabel = defined('\ProcessWire\Inputfield::skipLabelMarkup') ? constant('\ProcessWire\Inputfield::skipLabelMarkup') : Inputfield::skipLabelHeader;
+		$select->addOption(0, $this->_('Jump to page…'));
+		$select->addClass('InputfieldFormBuilderPageBreakNav', 'wrapClass');
+		$select->attr('data-url', $this->processor->getFormUrl());
+
+		foreach($pageBreaks as $pageNum => $fbField) {
+			if($fbField->label === $thisLabel) $pageNum = '';
+			$select->addOption($pageNum, $fbField->label);
+		}
+
+		$select->attr('value', $hLevel ? '0' : '');
+		$select->appendMarkup = "<button type='submit' style='display:none'>" . $this->_('Go') . "</button>";
+
+		if($showNav === 2) {
+			// insert after page break field headlines
+			$form->insertAfter($select, $this);
+		} else {
+			// insert before page break field headlines
+			$form->insertBefore($select, $this);
+		}
+	}
+
+	/**
+	 * Render value
+	 * 
+	 * @return string
+	 * 
+	 */
+	public function ___renderValue() {
+		$this->renderValue = true;
+		$out = $this->render(); 
+		$this->renderValue = false;
+		return $out;
+	}
+
+	/**
+	 * Process input
+	 * 
+	 * @param WireInputData $input
+	 * @return $this|InputfieldFormBuilder
+	 * 
+	 */
+	public function ___processInput(WireInputData $input) {
+		return $this;
+	}
+
+	/**
+	 * Configuration
+	 * 
+	 * @return InputfieldWrapper
+	 * 
+	 */
+	public function ___getConfigInputfields() {
+		$inputfields = parent::___getConfigInputfields();
+		
+		$removals = array(
+			'required',
+			'requiredIf',
+			'showIf',
+			'columnWidth',
+			'collapsed',
+			'visibility',
+		);
+		
+		foreach($removals as $name) {
+			$f = $inputfields->getChildByName($name);
+			if($f) $f->getParent()->remove($f);
+		}
+
+		if(FormBuilder::allowSummaryPage) {
+			$f = $this->wire('modules')->get('InputfieldCheckbox');
+			$f->attr('name', 'showSummary');
+			$f->label = $this->_('Show summary of entire form for this pagination?');
+			if($this->showSummary) $f->attr('checked', 'checked');
+			$inputfields->add($f);
+		}
+		
+		return $inputfields;
+	}
+
+}

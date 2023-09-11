@@ -1,0 +1,220 @@
+<?php namespace ProcessWire;
+
+/**
+ * ProcessWire Form Builder Inputfield to include one form within another
+ *
+ * Copyright (C) 2020 by Ryan Cramer Design, LLC
+ *
+ * PLEASE DO NOT DISTRIBUTE
+ *
+ */
+
+require_once(dirname(__FILE__) . '/InputfieldFormBuilder.php');
+
+/**
+ *
+ * @property int $formID
+ * @property int $entryID
+ * @property int $addForm
+ * @property FormBuilderProcessor|null $processor
+ * @property bool|int $noLabel
+ * @property int $labelType
+ * @property bool|int $isFieldset
+ *
+ *
+ */
+class InputfieldFormBuilderForm extends InputfieldFieldset implements InputfieldFormBuilderInterface {
+	
+	/**
+	 * Return information about this module
+	 *
+	 */
+	public static function getModuleInfo() {
+		return array(
+			'title' => 'Form (for FormBuilder)',
+			'version' => 1,
+			'summary' => 'Enables you to include one FormBuilder form within another.',
+			'requires' => 'FormBuilder',
+		);
+	}
+	
+	public function __construct() {
+		
+		parent::__construct();
+
+		$this->set('formID', 0);
+		$this->set('entryID', 0);
+		$this->set('addForm', ''); 
+		$this->set('processor', null);
+		$this->set('noLabel', false);
+		$this->set('labelType', 1); // -1 or 0=off, 1=normal, 2+=headlines
+		$this->set('isFieldset', false);
+	}
+	
+	public function set($key, $value) {
+		if($key === 'noLabel') {
+			if($value) {
+				$this->skipLabel = Inputfield::skipLabelHeader;
+			} else {
+				$this->skipLabel = Inputfield::skipLabelNo;
+			}
+		} else if($key === 'labelType') {
+			$value = (int) $value;
+			if($value < 1) {
+				$this->set('noLabel', true);
+			}
+		}
+		return parent::set($key, $value);
+	}
+	
+	public function renderReady(Inputfield $parent = null, $renderValueMode = false) {
+		$labelType = $this->labelType;
+		
+		if($labelType > 1) {
+			$this->entityEncodeLabel = false;
+			$this->label = 
+				"<h$labelType class='InputfieldFormBuilderFormLabel'>" . 
+					$this->wire('sanitizer')->entities($this->label) . 
+				"</h$labelType>";
+		}
+		
+		if($this->isFieldset && $labelType < 1) {
+			$this->addClass('InputfieldFormBuilderFormNoLabel', 'wrapClass');
+		}
+		
+		return parent::renderReady($parent, $renderValueMode);
+	}
+	
+	public function setup(FormBuilderProcessor $processor) {
+		$this->processor = $processor;
+		$addForm = $this->getAddForm();
+		if(!$addForm) return false;
+		$formArray = $addForm->getArray();
+		if(empty($formArray['children'])) return false;
+		$formArray = $this->prefixChildren($this->name, $formArray); 
+		$processor->maker->arrayToInputfields($formArray['children'], 1, 1, $this);
+
+		if($this->isFieldset) {
+			$class = $this->className();
+			$markup = InputfieldWrapper::getMarkup();
+			if(isset($markup['InputfieldFieldset']) && !isset($markup[$class])) {
+				$markup[$class] = $markup['InputfieldFieldset'];
+				InputfieldWrapper::setMarkup($markup);
+			}
+			$classes = InputfieldWrapper::getClasses();
+			if(isset($classes['InputfieldFieldset']) && !isset($classes[$class])) {
+				$classes[$class] = $classes['InputfieldFieldset'];
+				InputfieldWrapper::setClasses($classes);
+			}
+		}
+
+		return true;
+	}
+	
+	protected function prefixChildren($prefix, array $a) {
+		if(empty($a['children'])) return $a; 
+		$children = array();
+		foreach($a['children'] as $name => $child) {
+			if(!empty($child['children'])) {
+				$child = $this->prefixChildren($prefix, $child);
+			}
+			$newName = $prefix . '_' . $name;
+			foreach(array('showIf', 'requiredIf') as $ifType) {
+				if(empty($child[$ifType])) continue;
+				$child[$ifType] = $prefix . '_' . $child[$ifType]; 
+				$child[$ifType] = preg_replace('/,\s*/', ',' . $prefix . '_', $child[$ifType]); 
+			}
+			$children[$newName] = $child;
+		}
+		$a['children'] = $children;
+		return $a;
+	}
+
+	/**
+	 * @return null|FormBuilderForm
+	 * @throws WireException
+	 * 
+	 */
+	public function getAddForm() {
+		/** @var FormBuilder $forms */
+		$forms = $this->wire('forms');
+		if(!$this->addForm) return null;
+		list($formID, $formName) = explode(':', $this->addForm);
+		$addForm = $forms->load($formName);
+		if(!$addForm) $addForm = $forms->load((int) $formID);
+		if(!$addForm) return null;
+		return $addForm;
+	}
+	
+	public function ___getConfigInputfields() {
+		$inputfields = parent::___getConfigInputfields();
+
+		/** @var FormBuilder $forms */
+		$forms = $this->wire('forms');
+	
+		/** @var InputfieldSelect $f */
+		$f = $this->wire('modules')->get('InputfieldSelect'); 
+		$f->attr('name', 'addForm');
+		$f->label = $this->_('Form to add as field'); 
+		$f->description = 
+			$this->_('Note that all fields in the selected form will have their names prefixed with the name of this field.') . ' ' . 
+			$this->_('As a result, you can add as many copies of the same form as you need.'); 
+		
+		$selectedValue = '';
+		$formNames = $forms->getFormNames();
+		
+		foreach($formNames as $formID => $formName) {
+			$value = "$formID:$formName";
+			if($this->addForm === $value) $selectedValue = $value;
+			$f->addOption("$formID:$formName", $formName); 
+		}
+		
+		if(empty($selectedValue) && $this->addForm) {
+			list($formID, $formName) = explode(':', $this->addForm); 
+			$formID = (int) $formID;
+			$key = array_search($formName, $formNames); 
+			if($key) {
+				$selectedValue = "$key:$formName";
+			} else if(isset($formNames[$formID])) {
+				$selectedValue = "$formID:" . $formNames[$formID];
+			}
+		}
+		
+		if($selectedValue) $f->attr('value', $selectedValue);
+		$inputfields->add($f);
+	
+		/** @var InputfieldRadios $f */
+		$headline = $this->_('Headline');
+		$f = $this->wire('modules')->get('InputfieldRadios');
+		$f->attr('name', 'labelType');
+		$f->label = $this->_('Label type');
+		$f->addOption(-1, $this->_('Do not show label')); 
+		$f->addOption(1, $this->_('Normal label'));
+		$f->addOption(2, "$headline H2");
+		$f->addOption(3, "$headline H3");
+		$f->addOption(4, "$headline H4");
+		$f->addOption(5, "$headline H5");
+		$f->addOption(6, "$headline H6"); 
+		$f->attr('value', $this->labelType);
+		$inputfields->add($f);
+	
+		/** @var InputfieldCheckbox $f */
+		/*
+		$f = $this->wire('modules')->get('InputfieldCheckbox');
+		$f->attr('name', 'noLabel');
+		$f->label = $this->_('Do not show this field’s label above the form'); 
+		if($this->noLabel) $f->attr('checked', 'checked');
+		$inputfields->add($f);
+		*/
+		
+		/** @var InputfieldCheckbox $f */
+		$f = $this->wire('modules')->get('InputfieldCheckbox');
+		$f->attr('name', 'isFieldset');
+		$f->label = $this->_('Display as a fieldset');
+		if($this->isFieldset) $f->attr('checked', 'checked');
+		$inputfields->add($f);
+
+		return $inputfields;
+	}
+	
+}

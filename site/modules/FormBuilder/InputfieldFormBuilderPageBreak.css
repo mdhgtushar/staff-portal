@@ -1,0 +1,47 @@
+/*
+.FormBuilder.InputfieldForm .InputfieldFormBuilderPageBreakNav {
+	margin-bottom: 1em;
+}
+*/
+table.pwfb-summary {
+  border-spacing: 0;
+  border-collapse: collapse;
+}
+table.pwfb-summary th, table.pwfb-summary td {
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #ccc;
+  margin: 0;
+  padding: 10px 20px 10px 0;
+}
+table.pwfb-summary th {
+  width: 35%;
+  text-align: right;
+}
+table.pwfb-summary td > ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+table.pwfb-summary tr.pwfb-summary-pagebreak td {
+  padding-top: 30px;
+  vertical-align: bottom;
+}
+table.pwfb-summary tr.pwfb-summary-pagebreak td > :last-child {
+  margin-bottom: 0;
+}
+table.pwfb-summary tr.pwfb-summary-form td > :last-child {
+  margin-bottom: 0;
+}
+table.pwfb-summary th.pwfb-summary-edit {
+  vertical-align: bottom;
+}
+table.pwfb-summary td > .FormBuilderErrors > p {
+  margin: 0 0 1px 0;
+}
+table.pwfb-summary .pwfb-summary-error {
+  color: red;
+  font-weight: bold;
+}
+
+/*# sourceMappingURL=InputfieldFormBuilderPageBreak.css.map */

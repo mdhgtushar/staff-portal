@@ -1,0 +1,316 @@
+/**
+ * CSS used by the ProcessFormBuilder module
+ *
+ */
+
+span.asmFieldsetIndent {
+	float: left;
+	width: 15px;
+	height: 5px;
+}
+
+#content .asmFieldset {
+	font-weight: bold;
+}
+
+#content .InputfieldPageNameURL {
+	display: none; 
+}
+
+#content .asmFieldsetEnd .asmListItemStatus,
+#content .asmFieldsetEnd .asmListItemDesc {
+	display: none; 
+}
+
+#wrap_Inputfield_submit {
+	clear: both; 
+}
+
+#submit_page_entries {
+	float: right; 
+}
+
+body.AdminThemeDefault #submit_delete_entries,
+body.AdminThemeReno #submit_delete_entries {
+	float: right; 
+	margin-right: 0;
+}
+
+textarea.code {
+	font-family: Courier, "Courier New", Monospace, sans-serif; 
+	padding: 5px !important; 
+	border-style: dashed; 
+	border-color: #ccc; 
+	color: #555; 
+}
+
+#fieldsetActions > .ui-widget-content {
+	padding-bottom: 0;
+}
+	#fieldsetSubmitTo {
+		margin-bottom: 1em; 
+	}
+
+#savePageFields table th:first-child,
+#savePageFields table td:first-child {
+	text-align: right; 
+}
+
+.InputfieldRenderValueMode .Inputfields .InputfieldHidden {
+	/* so that it can be seen with renderValue */
+	display: block;
+}
+
+.AdminDataTable ins {
+	/* for entry-to-page diff viewer */
+	color: green;
+	text-decoration: underline;
+}
+.AdminDataTable del {
+	/* for entry-to-page diff viewer */
+	color: red; 
+	text-decoration: line-through;
+}
+
+body.pw-init .InputfieldForm {
+	display: none; 
+}
+
+#filter_form {
+	margin-bottom: 0;
+}
+
+#filter_form + #entries_list_form {
+	margin-top: 1em;
+}
+
+.AdminThemeDefault #filter_form + #entries_list_form {
+	margin-top: -1em;
+}
+
+#filter_form #dateFrom, 
+#filter_form #dateTo {
+	width: 100%;
+}
+#filter_form #wrap_dateFrom .notes,
+#filter_form #wrap_dateTo .notes {
+	display: none;
+}
+
+#entries_list_form td ul {
+	margin: 0;
+	padding: 0;
+	list-style: disc !important; 
+}
+
+#entries_list_form td ul li {
+	display: list-item; 
+	list-style: disc;
+	margin: 0 0 0 1.25em;
+	padding: 0; 
+}
+
+#entries_list_form td ul.InputfieldFormBuilderFileList li {
+	margin-left: 0;
+	list-style: none !important;
+}
+
+#entries_list_form .pwfb-date {
+	white-space: nowrap;
+	font-family: 'Monaco', monospace;
+	font-size: 14px;
+}
+
+#entries_list_form .pwfb-view {
+	font-family: 'Monaco', monospace;
+}
+
+.FormBuilderViewport {
+	margin-top: 1em;
+}
+
+#savePageFields table td {
+	vertical-align: middle;
+	
+}
+
+/*** IMPORT DIFF VIEWER ********************************************************/
+
+#import_form ins {
+	text-decoration: none;
+	color: green;
+}
+
+#import_form del {
+	color: red;
+	text-decoration: line-through;
+}
+
+#import_form ul.pwfb-import-diff {
+	margin-left: 1.2em;
+}
+
+#import_form .pwfb-import-diff li {
+	list-style: disc !important;
+}
+
+/*** ASMSELECT PAGE BREAKS IN FIELDS LIST *************************************/
+
+.InputfieldAsmSelect li.pageBreak {
+	margin-top: 7px;
+}
+
+li.pageBreak .asmListItemLabel {
+	background-color: rgba(0,0,0,0.15);
+}
+
+.InputfieldFormBuilderPageBreak .InputfieldContent {
+	padding-top: 40px;
+	border-bottom: 2px solid;
+	margin-bottom: 1px;
+}
+
+.InputfieldFormBuilderPageBreak h2 {
+	margin: 0;
+}
+
+/*** COLUMN WIDTH RESIZE OPTIONS **********************************************/
+
+.asmListItem {
+	/* prevent selection of text in asmListItem elements */
+	-moz-user-select: none;
+	-khtml-user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+.asmListItem > .asmListItemStatus > .columnWidth:hover {
+	/* hover percent item */
+	cursor: pointer; 
+	color: #fff;
+	opacity: 1.0;
+	text-decoration: underline;
+}
+
+.columnWidthActive,
+.columnWidthActive .asmListItem > .asmListItemStatus > .columnWidth:hover,
+.columnWidthActive .asmListSortable .asmListItemLabel,
+.columnWidthActive .asmListSortable .asmListItemHandle,
+.columnWidthActive .asmListSortable .asmListItemDesc,
+.columnWidthActive .asmListSortable .asmListItemStatus {
+	/* column width active: cursor when column width is being adjusted */
+	cursor: col-resize !important;
+}
+
+.columnWidthActive .asmListItemDesc,
+.columnWidthActive .asmListItemLabel {
+	/* column width active: reduce visibility of other text on the asmListItem */
+	opacity: 0.4;
+}
+
+.asmListItem .columnWidthBar {
+	/* column width progress bar */
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: rgba(0,0,0,0.4); 
+}
+
+.asmListItem .columnWidthBar > .columnWidthBarPct {
+	/* column with progress bar: percent indicator */
+	position: absolute;
+	display: inline-block;
+	right: 10px;
+	top: 4px;
+	color: #fff;
+	font-size: 14px;
+}
+
+.asmListItem.rowStart:before {
+	/* caret down to indicate starting column */
+	content: ' ';
+	color: #fff;
+	position: absolute;
+	display: block;
+	right: 45px;
+	top: -1px;
+	width: 0;
+	height: 0;
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 5px solid rgba(255,255,255,0.7);
+}
+.asmListItem.rowStart.rowError:before {
+	/* error in starting column */
+	border-top: 5px solid red;
+}
+
+.asmListItem.rowStop:before {
+	/* caret up to indicate stopping column */
+	content: ' ';
+	color: #fff;
+	position: absolute;
+	display: block;
+	right: 45px;
+	bottom: -1px;
+	width: 0;
+	height: 0;
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-bottom: 5px solid rgba(0,0,0,0.3);
+}
+.asmListItem.rowStop.rowError:before {
+	/* error in stopping column */
+	border-bottom: 5px solid red;
+}
+
+.asmListItem > .asmListItemStatus > .inputRequired,
+.asmListItem > .asmListItemStatus > .inputType {
+	/* hover required or field type indicators */
+	cursor: pointer;
+}
+
+.pwfb-entries-qv-field {
+	display: none !important;
+}
+
+.pwfb-entries-detail {
+	font-weight: normal;
+	opacity: 0.7;
+}
+
+.pwfb-th-sort {
+	cursor: pointer;
+}
+
+.pwfb-th-sort-active,
+.pwfb-th-sort:hover {
+	text-decoration: underline;
+}
+
+
+#submit_delete_entries_copy,
+#submit_filter_results_copy {
+	display: none;
+}
+
+#entries_list_table > tbody > tr > td:first-child {
+	white-space: nowrap;
+}
+
+#entries_list_markup, 
+#entries_list_markup > .InputfieldContent > .pw-table-responsive {
+	margin-top: 0;
+}
+
+#wrap_submit_update {
+	/* button in entries list columns asmSelect */
+	display: none;
+}
+#wrap_cols.InputfieldStateChanged #wrap_submit_update {
+	display: block;
+}
+

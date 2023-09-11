@@ -1,0 +1,276 @@
+/**
+ * FormBuilder Basic Framework
+ *
+ * This SCSS file is meant to be a starting point for your own form styling 
+ * 
+ */
+
+// Variables
+$form-input-border: 1px solid #ddd;
+$form-input-padding-vertical: 10px;
+$form-input-padding: 5px 10px;
+$form-input-height: 40px; 
+$form-input-background: lighten(#eee, 5%);
+$form-input-background-focus: lighten($form-input-background, 5%);
+$form-font-size: 16px; 
+$form-font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+$form-line-height: 1.5em;
+$form-label-font-weight: 600;
+$form-fieldset-border: $form-input-border;
+$form-fieldset-padding: 25px; 
+$form-button-padding: 10px 30px; 
+$form-button-background: darken($form-input-background, 60%);
+$form-button-color: #fff;
+$form-button-border: none;
+$form-button-radius: 4px;
+$form-error-color: red;
+$form-alert-padding: 10px 15px;
+$form-alert-error-background: red;
+$form-alert-error-color: #fff;
+$form-alert-success-background: green;
+$form-alert-success-color: #fff;
+
+.FormBuilder {
+	&, input, textarea, select, button, .ui-widget {
+		box-sizing: border-box;
+		font-family: $form-font-family;
+		font-size: $form-font-size;
+		line-height: $form-line-height;
+	}
+	.alert {
+		padding: $form-alert-padding;
+	}
+	.alert-error {
+		background: $form-alert-error-background;
+		color: $form-alert-error-color;
+	}
+	.alert-success {
+		background: $form-alert-success-background;
+		color: $form-alert-success-color;
+	}
+}
+
+.FormBuilder.InputfieldForm {
+
+	padding: 1px;
+	margin: 1em 0;
+
+	// additional padding for inputs and textareas 
+	input:not([type=radio]):not([type=checkbox]):not([type=file]):not([type=range]),
+	select:not([multiple]) {
+		margin: 0;
+		box-sizing: border-box;
+		height: $form-input-height;
+		max-width: 100%;
+		width: 100%;
+		padding: 0 $form-input-padding-vertical;
+		border: $form-input-border;
+		background: $form-input-background;
+		vertical-align: middle;
+		display: inline-block;
+		&:focus {
+			background: $form-input-background-focus;
+		}
+	}
+
+	select[multiple],
+	textarea {
+		padding: $form-input-padding;
+		border: $form-input-border;
+		background: $form-input-background;
+		&:focus {
+			background: $form-input-background-focus;
+		}
+	}
+
+	select:not([multiple]):not([size]) {
+		-webkit-appearance: none;
+		-moz-appearance: none;
+		padding-right: 20px;
+		background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2224%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2016%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%20%20%20%20%3Cpolygon%20fill%3D%22%23666%22%20points%3D%2212%201%209%206%2015%206%22%20%2F%3E%0A%20%20%20%20%3Cpolygon%20fill%3D%22%23666%22%20points%3D%2212%2013%209%208%2015%208%22%20%2F%3E%0A%3C%2Fsvg%3E%0A");
+		background-repeat: no-repeat;
+		background-position: 100% 50%;
+		
+		&::-ms-expand {
+			display: none;
+		}
+		
+		option {
+			color: #444;
+		}
+	}
+	
+	// improve alignment of file inputs
+	input[type=file] {
+		line-height: 1;
+	}
+	
+	// form submit or other buttons
+	button {
+		padding: $form-button-padding;
+		background: $form-button-background;
+		color: $form-button-color;
+		border: $form-button-border;
+		border-radius: $form-button-radius;
+		&:hover {
+			cursor: pointer;
+			background: darken($form-button-background, 10%); 
+		}
+	}
+
+	// error messages for specific inputs
+	.input-error {
+		color: $form-error-color;
+		font-size: smaller;
+	}
+
+	// element that wraps label + input
+	.Inputfield {
+		margin-bottom: 2em;
+		// label header
+		.InputfieldHeader {
+			display: block;
+			font-weight: $form-label-font-weight;
+			padding-bottom: 0.25em;
+		}
+	}
+
+	// descriptive text within Inputfield elements
+	.notes,
+	.description {
+		margin-bottom: 0.5em;
+		margin-top: 0;
+		opacity: 0.6;
+	}
+	.notes {
+		font-size: smaller;
+	}
+
+	// styling of fieldset elements
+	fieldset.InputfieldFieldset {
+		padding: $form-fieldset-padding;
+		padding-top: 0;
+		padding-bottom: 0;
+		border: $form-fieldset-border;
+		
+		legend {
+			font-weight: $form-label-font-weight;
+			font-size: larger;
+		}
+		> legend + .InputfieldContent {
+			margin-top: 1em;
+		}
+		
+		> .InputfieldContent > .description {
+			margin: 1em 0;
+		}
+	}
+
+	// file inputs
+	.InputfieldFormBuilderFile {
+		padding: $form-fieldset-padding;
+		padding-bottom: $form-fieldset-padding / 2;
+		border: $form-fieldset-border; 
+		background: $form-input-background;
+	}
+	
+	.InputfieldFormBuilderForm {
+		margin-bottom: 0;
+		> .InputfieldHeader:not(.InputfieldHeaderHidden) {
+			margin-bottom: 10px;
+			& + .InputfieldContent {
+				label.InputfieldHeader {
+					font-weight: normal;
+				}
+			}
+		}
+	}
+	fieldset.InputfieldFormBuilderForm {
+		padding-top: 20px;
+		margin: 20px 0;
+		border-color: #eee;
+		border-size: 1px;
+		legend {
+			color: #777;
+			font-weight: bold;
+			text-transform: uppercase;
+			padding: 0 5px;
+		}
+	}
+	
+	.InputfieldFormBuilderForm + .InputfieldFormBuilderForm {
+		//border-top: 1px solid #ccc;
+		padding-top: 20px;
+	}
+	
+	.InputfieldFormBuilderPageBreak {
+		margin-bottom: 20px;
+	}
+	
+	// improve alignment for checkboxes and radio buttons
+	.InputfieldCheckbox,
+	.InputfieldCheckboxes,
+	.InputfieldRadios {
+		> .InputfieldContent {
+			// makes it align properly when placed next to other inputs
+			padding-top: 5px; 
+		}
+		.pw-no-select {
+			position: relative;
+			top: 2px;
+		}
+	}
+	
+	.InputfieldToggle .InputfieldToggleGroup label {
+		height: $form-input-height;
+		line-height: $form-input-height;
+		padding-top: 0;
+		padding-bottom: 0;
+		vertical-align: middle;
+	}
+
+	// show a red asterisk after label when field "required" 
+	.InputfieldStateRequired > .InputfieldHeader:first-child:after {
+		color: red;
+		content: '*';
+	}
+
+	// honeypot 
+	#wrap_Inputfield- {
+		display: none;
+	}
+
+	.InputfieldSubmit button {
+		font-weight: bold;
+		&:hover {
+			opacity: 0.9;
+		}
+	}
+	
+	.InputfieldColumnWidth > .InputfieldHeaderHidden {
+		&::before {
+			display: block;
+			content: "\00a0 "; // nbsp
+		}
+	}
+}
+
+// clearfix stuff
+.Inputfields > .Inputfield > .InputfieldContent:before,
+.Inputfields > .Inputfield > .InputfieldContent:after,
+.InputfieldForm:after,
+.pw-clearfix:before,
+.pw-clearfix:after {
+	content: "";
+	display: table;
+	border-collapse: collapse;
+}
+.Inputfields > .Inputfield > .InputfieldContent:after,
+.InputfieldForm:after,
+.pw-clearfix:after {
+	clear: both;
+}
+// clearfix support for IE7 
+.pw-clearfix {
+	min-height: 0;
+}

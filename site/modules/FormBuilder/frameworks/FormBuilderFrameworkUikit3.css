@@ -1,0 +1,21 @@
+.InputfieldFormBoldLabels .uk-form-label {
+	font-weight: bold;
+}
+
+.InputfieldFieldset > legend + .InputfieldContent {
+	margin-top: 1em;
+}
+
+.uk-radio + span,
+.uk-checkbox + span {
+	/* for consistency with other form labels in Uikit */
+	font-size: .875rem;
+}
+
+.InputfieldCheckbox > .InputfieldContent,
+.InputfieldCheckboxes > .InputfieldContent,
+.InputfieldRadios > .InputfieldContent {
+	/* to ensure better alignment with any other fields in a row */
+	padding-top: 7px;
+}
+

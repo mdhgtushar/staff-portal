@@ -1,0 +1,3284 @@
+<?php namespace ProcessWire;
+
+/**
+ * Form Builder Process
+ *
+ * Handles the admin functions for managing forms and entries. 
+ *
+ * Copyright (C) 2020 by Ryan Cramer Design, LLC
+ *
+ * PLEASE DO NOT DISTRIBUTE
+ *
+ * HOOKABLE METHODS
+ * ================
+ * 
+ * @method array executeNavJSON(array $options)
+ * 
+ * @method string execute()
+ * @method string executeEditForm()
+ * @method string executeExportForm()
+ * @method string executeEmbedForm()
+ * @method string executeAddForm()
+ * @method string executeSaveForm()
+ * @method void executeSaveFormSettings(FormBuilderForm $form, InputfieldForm $editForm)
+ * @method string executeEditField()
+ * @method string executeView()
+ * @method string executeListEntries()
+ * 
+ * @method InputfieldForm buildEditForm($id)
+ * @method InputfieldWrapper buildEditFormFields(FormBuilderForm $form)
+ * @method InputfieldWrapper buildEditFormSettings(FormBuilderForm $form)
+ *
+ * @method InputfieldWrapper buildEditField(FormBuilderField $editField = null, array $cloneOptions = null, $formID = 0)
+ * 
+ * @method InputfieldWrapper buildListEntriesForm(FormBuilderForm $form, array $entries, $currentUrl)
+ * @method InputfieldWrapper buildListFilterForm(FormBuilderForm $form, $total, $currentUrl)
+ * @method MarkupAdminDataTable buildListEntries(FormBuilderForm $form, array $entries)
+ * 
+ * @method string compareEntry(FormBuilderForm $form, array $entry, $pageID)
+ * @method array|bool compareEntryIsDifferent($entryValue, $pageValue, $fieldType, array $details)
+ * 
+ * @method string executeViewEntry($edit = false)
+ * @method string executeEditEntry()
+ * 
+ * @method array getInputfieldPageClasses()
+ * 
+ * @method install()
+ * @method uninstall()
+ * 
+ * 
+ * @todo: figure out some way for forms-in-forms to work with savePage(), if possible?
+ * @todo: add "novalidate" attribute option to <form>
+ * @todo: Exception, if you rename and change fieldtype at the same time: http://processwire.com/talk/topic/4931-exception-if-you-rename-and-change-fieldtype-at-the-same-time/
+ * @todo: Assignment of roles: http://processwire.com/talk/topic/4900-confusion-about-form-builder-ua/
+ * @todo: show error message if attempting to embed or preview form that has no fields in it yet
+ * @todo: fix issue where integer field won't accept min setting of 0
+ * 
+ * FIXED file links on the entries list screen don't work
+ * FIXED add support for reply-to email addresses.
+ * FIXED Prevent emails from being sent on follow-up edits to form entries
+ * 
+ *
+ */
+
+class ProcessFormBuilder extends Process {
+
+	/**
+	 * Page name created for the page used by this Process module
+	 *
+	 */
+	const adminPageName = 'form-builder';
+
+	/**
+	 * Returns information about the module for ProcessWire's Module interface
+	 *
+	 */
+	public static function getModuleInfo() {
+		return array(
+			'title' => __('Forms', __FILE__), 
+			'summary' => __('Create or edit forms and manage submitted entries.', __FILE__), 
+			'version' => 46, 
+			'requires' => array('FormBuilder'),
+			'permission' => 'form-builder',
+			'icon' => 'building', 
+			'useNavJSON' => true,
+			'nav' => array(
+				array(
+					'url' => '?entries',
+					'label' => __('Entries', __FILE__),
+					'icon' => 'server',
+					'navJSON' => 'navJSON/?get=entries'
+				),
+				array(
+					'url' => '?edit',
+					'label' => __('Edit', __FILE__), 
+					'icon' => 'pencil-square-o',
+					'navJSON' => 'navJSON/?get=edit'
+				),
+				array(
+					'url' => 'addForm/',
+					'label' => __('Add New', __FILE__),
+					'icon' => 'plus-circle',
+					'permission' => 'form-builder-add',
+				)
+			)
+		);
+	}
+
+	/**
+	 * Names of selectable fields, used by the buildEditForm functions
+	 * 
+	 * Populated only when editing a form
+	 * 
+	 * @var array
+	 *
+	 */
+	protected $fieldNames = array();
+
+	/**
+	 * Labels of selectable fields, indexed by field name
+	 * 
+	 * Populated only when editing a form
+	 * 
+	 * @var array
+	 * 
+	 */
+	protected $fieldLabels = array();
+
+	/**
+	 * Names of selectable fields, indexed by type name (array of arrays)
+	 * 
+	 * Populated only when editing a form
+	 *
+	 * @var array
+	 *
+	 */
+	protected $fieldNamesByType = array();
+
+	/**
+	 * Inputfields that we allow for fields of type 'Page'
+	 *
+	 * We specifically exclude PageListSelect* types. 
+	 * As used in the buildEditField function.
+	 * 
+	 * @var array
+	 *
+	 */
+	protected $inputfieldPageClasses = array(
+		'InputfieldSelect', 
+		'InputfieldSelectMultiple',
+		'InputfieldAsmSelect',
+		'InputfieldCheckboxes',
+		'InputfieldRadios',
+	);
+
+	/**
+	 * Extra Inputfield classes that are made available as Inputfield selections (not including 'Inputfield' prefix)
+	 * 
+	 * @var array
+	 * 
+	 */
+	protected $inputfieldExtraClasses = array(
+		'FormBuilderPageBreak',
+		'FormBuilderFile',
+		'FormBuilderForm',
+		'FormBuilderStripe',
+	);
+
+	/**
+	 * @var FormBuilder
+	 * 
+	 */
+	protected $forms;
+
+	/**
+	 * @var ProcessFormBuilderEntries|null
+	 * 
+	 */
+	protected $processEntries = null;
+
+	/**
+	 * Initialize the module, load dependencies and setup breadcrumbs
+	 *
+	 */
+	public function init() {
+		$this->forms = $this->wire('forms');
+		parent::init();
+		if($this->input->urlSegment1) {
+			$this->wire('breadcrumbs')->add(new Breadcrumb($this->page->url, $this->_('Forms'))); // First breadcrumb label
+		}
+		$this->modules->get('JqueryWireTabs'); 
+		
+		if(!$this->forms->isValidLicense()) throw new WireException($this->_('Please enter a valid license key in the Form Builder module settings'));
+
+		require_once(dirname(__FILE__) . '/FormBuilderProcessor.php'); 
+	}
+
+	/**
+	 * Render items for admin ajax navigation
+	 * 
+	 * @param array $options
+	 * @return array|string
+	 *
+	 */
+	public function ___executeNavJSON(array $options = array()) {
+		$options['items'] = array();
+		// $hasEditAllPermission = $this->wire('user')->hasPermission('form-edit');
+		$get = $this->wire('input')->get->name('get');
+	
+		if($get == 'edit') {
+			foreach($this->forms->loadAll() as $name => $form) {
+				/** @var FormBuilderForm $form */
+				if(!$form || !$form->hasPermission('form-list')) continue;
+				if($form->hasFlag(FormBuilderProcessor::formFlagDisabled)) continue;
+				if(!$form->hasPermission('form-edit')) continue; 
+				$options['items'][] = $form;
+				$numFields = $form->numFields;
+				$form->set('itemLabel2', sprintf($this->_n('%d field', '%d fields', $numFields), $numFields));
+			}
+			$options['itemLabel2'] = 'itemLabel2';	
+			$options['edit'] = 'editForm/?id={id}';
+			
+		} else if($get === 'entries') {
+			foreach($this->forms->loadAll() as $name => $form) {
+				/** @var FormBuilderForm $form */
+				if(!$form || !$form->hasPermission('form-list')) continue;
+				if($form->hasFlag(FormBuilderProcessor::formFlagInclude) || $form->hasFlag(FormBuilderProcessor::formFlagDisabled)) continue;
+				if(!$form->hasPermission('entries-list')) continue;
+				$options['items'][] = $form;
+				$numEntries = $form->numEntries;
+				$lastEntryDate = $form->get('lastEntryDate');
+				if($lastEntryDate) $lastEntryDate = ' • ' . wireRelativeTimeStr($lastEntryDate, true);
+				if($numEntries) {
+					$label2 = sprintf($this->_n('%d entry', '%d entries', $numEntries), $numEntries) . ' ' . $lastEntryDate;
+				} else {
+					$label2 = $this->labels('none');
+				}
+				$form->set('itemLabel2', $label2);
+			}
+			$options['edit'] = 'listEntries/?id={id}';
+			$options['itemLabel2'] = 'itemLabel2';
+		}
+		
+		if(empty($options['items'])) {
+			$item = new WireData();
+			$item->set('name', $this->_('No forms yet'));
+			$item->set('itemLabel2', '');
+			$options['items'][] = $item;
+		}
+		
+		$options['itemLabel'] = 'name';
+		$options['add'] = null;
+
+		return parent::___executeNavJSON($options); 
+	}
+
+	/**
+	 * Get predefined translation label by name
+	 * 
+	 * @param string $name
+	 * @return string
+	 * 
+	 */
+	public function labels($name) {
+		switch($name) {
+			case 'save': return $this->_('Save'); break;
+			case 'saved-form': return $this->_('Saved form'); break;
+			case 'example': return $this->_('Example:'); break;
+			case 'loading': return $this->_('Loading...'); break;
+			case 'no-access': return $this->_('You do not have access'); break;
+			case 'unknown-form': return $this->_('Unknown Form'); break;
+			case 'none': return $this->_('None'); break;
+			case '(default)': return $this->_('(default)'); break;
+			case 'n/a': return $this->_('N/A'); break;
+			default: return $name;
+		}
+	}
+
+	/**
+	 * @return ProcessFormBuilderEntries
+	 * 
+	 */
+	public function processEntries() {
+		if($this->processEntries === null) {
+			require_once(__DIR__ . '/ProcessFormBuilderEntries.php');
+			$this->processEntries = new ProcessFormBuilderEntries($this->forms, $this);
+		}
+		return $this->processEntries;
+	}
+
+	/**
+	 * Identify requested form in URL, load it and return it 
+	 * 
+	 * @param int|string $formID Form ID
+	 * @param string $permissionName If user lacks this permission for requested form, throw exception
+	 * @return FormBuilderForm|null
+	 * @throws WireException
+	 * @throws WirePermissionException
+	 * 
+	 */
+	public function getForm($formID, $permissionName = 'form-edit') {
+		$form = null;
+		if($formID && strpos($formID, '.') !== false) list($formID,) = explode('.', $formID, 2);
+		$formID = (int) $formID;
+		$form = $formID ? $this->forms->load($formID) : null;
+		if(!$form || !$form->id) {
+			throw new WireException($this->labels('unknown-form') . " - $formID");
+		}
+		if($permissionName !== '' && !$form->hasPermission($permissionName)) {
+			throw new WirePermissionException($this->labels('no-access'));
+		}
+		return $form;
+	}
+
+	/**
+	 * Lists the available forms and gives button to add new form
+	 * 
+	 * @return string
+	 *
+	 */
+	public function ___execute() {
+
+		$configData = $this->modules->getModuleConfigData('FormBuilder');
+
+		if(empty($configData) || !is_file($this->config->paths->templates . FormBuilderMain::name . '.php')) {
+			$this->error($this->_("Form Builder isn't yet fully configured."));  		
+			$configLink = "<a href='{$this->config->urls->admin}module/edit/?name=FormBuilder'>" . $this->_('Form Builder Configuration') . "</a>";
+			return $this->_('Please go back to review and save your configuration.') . ' ' . $configLink; 
+		}
+
+		/** @var MarkupAdminDataTable $table */
+		$table = $this->modules->get('MarkupAdminDataTable'); 
+		/** @var FormBuilder $forms */
+		if(count($this->forms)) {
+			$table->headerRow(array(
+				$this->_x('Form', 'list-thead'),
+				$this->_x('Entries', 'list-thead'),
+				$this->_x('Last Submitted', 'list-thead'),
+				$this->_x('ID', 'list-thead'),
+			)); 
+
+			foreach($this->forms as $id => $name) { 
+				$form = $this->forms->load($name);
+				if(!$form || !$form->hasPermission('form-list')) continue;
+				$cols = array();
+				$total = $this->forms->countEntries($id); 
+				$label = $name ? $name : "form $id"; 
+				$entries = sprintf($this->_n('%d entry', '%d entries', $total), $total);
+				if($this->forms->hasPermission('form-edit', $form)) {
+					$cols[$label] = "./editForm/?id=$id";
+				} else {
+					$cols[] = $label;
+				}
+				if($this->forms->hasPermission('entries-list', $form)) {
+					$cols[$entries] = "./listEntries/?id=$id";
+					$newestDateStr = $form->lastEntryDate;
+					$newestDateRel = $newestDateStr ? wireRelativeTimeStr($newestDateStr) : '';
+					$cols[] = $newestDateRel;
+				} else {
+					$cols[] = $entries;
+					$cols[] = $this->labels('n/a'); 
+				}
+				$cols[] = $id;
+				$table->row($cols); 
+			}
+		} else {
+			$table->row(array($this->_('No forms yet'))); 
+		}
+		$out = $table->render();
+		if($this->wire('user')->hasPermission('form-builder-add')) {
+			/** @var InputfieldButton $btn */
+			$btn = $this->modules->get('InputfieldButton'); 
+			$btn->href = './addForm/';
+			$btn->value = $this->_('Add New Form'); 
+			$btn->showInHeader(true);
+			$btn->icon = 'plus-circle';
+			$out .= $btn->render();
+		}
+
+		$info = FormBuilder::getModuleInfo();
+		$version = preg_replace('/^(\d)(\d)(\d+)$/', '$1.$2.$3', str_pad($info['version'], 3, '0', STR_PAD_LEFT));
+		$out .= "<p class='detail'>$version</p>";
+
+		return $out; 
+	}
+
+	/**
+	 * Build the edit form screen
+	 *
+	 * @param int $id ID of the form being edited
+	 * @return InputfieldForm
+	 * @throws WireException|WirePermissionException
+	 *
+	 */
+	protected function ___buildEditForm($id) {
+
+		$id = (int) $id; 
+		if($id === 0) $this->wire()->session->redirect('../'); 
+		$form = $this->getForm($id, 'form-edit'); 
+		$flagInclude = $form->hasFlag(FormBuilderProcessor::formFlagInclude);
+
+		$headline = ucfirst($form->name); // Headline when editing a form
+		$this->headline($headline);
+		$this->browserTitle($headline . ' • Forms');
+
+		/** @var InputfieldForm $editForm */
+		$editForm = $this->modules->get('InputfieldForm');
+		$editForm->addClass('InputfieldFormConfirm');
+		$editForm->attr('action', "../saveForm/");
+		$editForm->attr('method', "post");
+
+		$editForm->add($this->buildEditFormFields($form));
+		if(!$flagInclude) $editForm->add($this->buildEditFormActions($form));
+		if(!$flagInclude) $editForm->add($this->buildEditFormOutput($form)); 
+		$editForm->add($this->buildEditFormSettings($form)); 
+		if($this->forms->useRoles && !$flagInclude && ($this->wire('user')->isSuperuser() || $this->wire('user')->hasPermission('form-builder-admin'))) {
+			$editForm->add($this->buildEditFormAccess($form));
+		}
+		if(!$flagInclude) $editForm->add($this->buildEditFormEmbed($form));
+		$editForm->add($this->buildEditFormExport($form)); 
+		if((!$flagInclude || $form->entries()->getTotal()) && $form->hasPermission('entries-list')) $editForm->add($this->buildEditFormEntries($form)); 
+		$editForm->add($this->buildEditFormPreview($form)); 
+
+		/** @var InputfieldHidden $field */
+		$field = $this->modules->get("InputfieldHidden"); 
+		$field->attr('id+name', 'form_id'); 
+		$field->attr('value', $id); 	
+		$editForm->add($field); 
+
+		return $editForm; 
+	}
+
+	/**
+	 * Build the fields screen of the form editor (tab 1)
+	 *
+	 * @param FormBuilderForm $form Form being edited. 
+	 * @return InputfieldWrapper
+	 *
+	 */
+	protected function ___buildEditFormFields(FormBuilderForm $form) {
+
+		$fieldset = new InputfieldWrapper();
+		$fieldset->attr('title', $this->_x('Fields', 'tab'));
+		$fieldset->class = 'WireTab';
+		$hasPageBreaks = false;
+		$children = array();
+
+		if($form->numChildren) { 
+			$editLinkModal = $this->wire('session')->get('touch') ? false : true; 
+			if($form->hasFlag(FormBuilderProcessor::formFlagNoModal)) $editLinkModal = false;
+
+			/** @var InputfieldAsmSelect $field */
+			$field = $this->modules->get("InputfieldAsmSelect"); 
+			$field->attr('id+name', 'form_fields'); 
+			$field->label = $this->_x('Fields', 'asmSelect-label');
+			$field->icon = 'building-o';
+			$field->setAsmSelectOption('hideWhenEmpty', true);
+			$field->setAsmSelectOption('hideWhenAdded', true);
+			$field->setAsmSelectOption('editLinkModal', $editLinkModal);
+			$field->setAsmSelectOption('hideDeleted', false);
+			$field->setAsmSelectOption('sortable', true);
+			$field->setAsmSelectOption('editLink', "../editField/?id={$form->id}&name={value}"); // &modal=1");
+
+			$lastFieldset = array();
+			$lastLevel = 0;
+			// $typesLoaded = array();
+			// $dummyEvent = new HookEvent();
+			$children = $form->getChildrenFlat();
+
+			foreach($children as $key => $child) {
+
+				/*
+				// ensure CSS and JS files get loaded for the preview to work properly
+				if(!in_array($child->type, $typesLoaded)) {
+					$i = $this->modules->get("Inputfield{$child->type}"); 
+					// if($i) $i->hookRender($dummyEvent);
+					if($i) $i->renderReady(); 
+					$typesLoaded[] = $child->type; 
+				}
+				*/
+
+				if(count($lastFieldset) && $lastLevel > $child->level) {
+					$fieldsetName = array_pop($lastFieldset); 
+					$field->addOption($fieldsetName, $fieldsetName, array('selected' => 'selected')); 
+				}
+
+				$width = $child->columnWidth > 0 && $child->columnWidth <= 100 ? $child->columnWidth : 100;
+				$widthLabel = $this->wire('sanitizer')->entities1($this->_('Click and drag to adjust field width'));
+				$columnWidth = "<span class='columnWidth ui-priority-secondary' data-was='$width' title='$widthLabel'>$width%</span>";
+				
+				$fieldLabel = $this->wire('sanitizer')->entities($child->label);
+				if(strlen($fieldLabel) > 30) {
+					$fieldLabel = substr($fieldLabel, 0, 30); 
+					$fieldLabel = substr($fieldLabel, 0, strrpos($fieldLabel, ' ')) . '&hellip;';
+				}
+				
+				$childType = str_replace('FormBuilder', '', $child->type); 
+				$childType = preg_replace('/([A-Z][^A-Z])/', ' $1', $childType); // i.e. 'SelectMultiple' => 'Select Multiple'
+			
+				$requiredLabel = '';
+				$requiredText = '';
+				if($child->required) {
+					if($child->requiredIf) {
+						$requiredText = '**';
+						$requiredLabel = sprintf($this->_('Required if: %s'), $child->requiredIf);
+					} else {
+						$requiredText = '*';
+						$requiredLabel = $this->_('Required');
+					}
+				}
+				$requiredLabel = $this->wire('sanitizer')->entities1($requiredLabel);
+				$inputRequired = "<span class='inputRequired' title='$requiredLabel'>$requiredText</span>";
+				$requiredDesc = $this->_('Double click to toggle field “required” status');
+
+				/*
+				if($child->showIf) {
+					$condition = $this->wire('sanitizer')->entities1(sprintf($this->_('Show if: %s'), $child->showIf));
+					$childShowIf = "<span class='inputInfo' title='$condition'>" . wireIconMarkup('eye-slash') . "</span>";
+				} 
+				*/
+				
+				$attrs = array(
+					'selected' => 'selected',
+					'data-status' => $inputRequired . trim("<span title='$requiredDesc' class='inputType'>$childType</span> $columnWidth"),
+					'data-desc' => $fieldLabel
+				);
+
+				$label = $child->name;
+				if($child->type === 'FormBuilderPageBreak') {
+					$attrs['class'] = 'pageBreak';
+					$hasPageBreaks = true;
+				} else if($child->pageBreak) {
+					// deprecated
+					$hasPageBreaks = true;
+					if($child->pageBreak < 0) {
+						$attrs['class'] = 'pageBreakBefore';
+					} else {
+						$attrs['class'] = 'pageBreakAfter';
+					}
+				}
+
+				// if($child->required) $label .= '*';
+				$field->addOption($child->name, $label, $attrs); 
+				$lastLevel = $child->level;
+				if($child->type == 'Fieldset') {
+					$lastFieldset[] = $child->name . '_END';
+				} else if($child->type) {
+					$this->fieldNames[] = $child->name;
+					$this->fieldLabels[$child->name] = $child->label;
+					if(!isset($this->fieldNamesByType["$child->type"])) $this->fieldNamesByType["$child->type"] = array();
+					$this->fieldNamesByType["$child->type"][] = $child->name;
+				}
+			}
+
+			while($fieldsetName = array_pop($lastFieldset)) { 
+				$field->addOption($fieldsetName, $fieldsetName, array('selected' => 'selected')); 
+			}
+
+			$fieldset->add($field); 
+		}
+
+		sort($this->fieldNames);
+		ksort($this->fieldNamesByType); 
+		ksort($this->fieldLabels);
+		foreach($this->fieldNamesByType as $typeName => $fieldNames) {
+			sort($fieldNames); 
+			$this->fieldNamesByType[$typeName] = $fieldNames;
+		}
+
+		$fs = $this->buildEditField(null, $children, $form->id); 
+		if(count($form->children)) $fs->collapsed = Inputfield::collapsedYes; 
+		$fieldset->add($fs); 
+
+		/** @var InputfieldSubmit $field */
+		$field = $this->modules->get("InputfieldSubmit"); 
+		$field->attr('id', 'submit_save_form_fields');
+		$field->attr('name', 'submit_save_form'); 
+		$field->showInHeader(true);
+		$field->attr('value', $this->labels('save'));
+		$fieldset->add($field); 
+		
+		// this ensures it runs after the asmSelect is fully initialized
+		$fieldset->appendMarkup = "<script>jQuery(document).ready(function() { ProcessFormBuilderInitFields(); });</script>";
+		
+		if($hasPageBreaks && !($form->saveFlags & FormBuilderProcessor::saveFlagDB)) {
+			$this->warning($this->_('Because your form has page breaks/paginations, you must also enable “Save to entries database” on the “Actions” tab.'));
+		}
+
+		return $fieldset; 
+	}
+
+	/**
+	 * Build the settings screen of the form editor (tab 3)
+	 *
+	 * @param FormBuilderForm $form Form being edited. 
+	 * @return InputfieldWrapper
+	 *
+	 */
+	protected function ___buildEditFormSettings(FormBuilderForm $form) {
+
+		$fieldset = new InputfieldWrapper();
+		$fieldset->attr('title', $this->_x('Settings', 'tab')); 
+		$fieldset->class = 'WireTab';
+		$formInclude = $form->hasFlag(FormBuilderProcessor::formFlagInclude);
+	
+		// -------------------
+
+		if($form->hasPermission('form-delete')) {
+			/** @var InputfieldName $field */
+			$field = $this->modules->get("InputfieldName"); 	
+			$field->label = $this->_('Form Name'); 
+			$field->attr('id+name', 'form_name'); 
+			$field->attr('value', $form ? $form->name : ''); 
+			$field->required = true; 
+			$field->collapsed = Inputfield::collapsedYes; 
+			$field->notes = $this->_('Avoid changing this for forms that are currently in use.'); // Note about changing the form name
+			$fieldset->add($field); 
+		}
+
+		// -------------------
+		
+		if(!$formInclude && $form->getNumPaginations() > 1) {
+			/** @var InputfieldFieldset $fieldset2 */
+			$fieldset2 = $this->modules->get('InputfieldFieldset');
+			$fieldset2->label = $this->_('Pagination / Page breaks');
+			$fieldset2->set('themeOffset', 1); 
+			$fieldset2->icon = 'files-o';
+			$fieldset->add($fieldset2);
+
+			$noneLabel = $this->labels('none');
+			$defaultLabel = ' [span.detail] ' . $this->labels('(default)') . ' [/span]';
+
+			/** @var InputfieldSelect $f */
+			$f = $this->modules->get('InputfieldSelect');
+			$f->attr('name', 'form_hLevel');
+			$f->label = $this->_('Show headline above each pagination?');
+			$f->description = 
+				$this->_('When used, the headline shown will be each page break field’s label.') . ' ' . 
+				$this->_('An H2 or H3 headline is recommended, unless a different headline makes more sense in your site structure.');
+			$f->notes =
+				'• ' . $this->_('When using headlines, it’s worthwhile to place a page break field as the first field in the form, so that the first pagination can also have a headline.') . "\n" . 
+				'• ' . $this->_('If you enter a “description” for any page break field, it will be shown at the top of the pagination (under headline, if present) regardless of this setting.'); 
+			$f->addOption(0, $noneLabel);
+			$f->addOption(1, 'H1: ' . $this->_('Primary'));
+			$f->addOption(2, 'H2: ' . $this->_('Secondary'));
+			$f->addOption(3, 'H3: ' . $this->_('Tertiary'));
+			$f->addOption(4, 'H4: ' . $this->_('Quaternary'));
+			$f->addOption(5, 'H5: ' . $this->_('Quinary'));
+			$f->addOption(6, 'H6: ' . $this->_('Senary'));
+			$value = $form->get('hLevel');
+			if($value === null) $value = 2; // default H2
+			$value = (int) $value;
+			if($value === 0) $f->collapsed = Inputfield::collapsedYes;
+			$f->attr('value', (int) $value);
+			$fieldset2->add($f);
+
+			/** @var InputfieldRadios $f */
+			if(FormBuilder::allowPageNav) { // allow option only if it's already enabled (@todo this should be removed once feature goes live)
+				$f = $this->modules->get('InputfieldRadios');
+				$f->attr('name', 'form_showNav');
+				$f->label = $this->_('Show pagination navigation select box above form?');
+				$f->description = $this->_('This enables users to jump to any pagination by selecting it from a select/drop-down.');
+				$f->notes = $this->_('If no headline or description is shown for the pagination then both “Show” options do the same thing.');
+				$f->addOption(0, $noneLabel);
+				$f->addOption(1, $this->_('Show before pagination headline/description'));
+				$f->addOption(2, $this->_('Show after pagination headline/description'));
+				$f->attr('value', (int) $form->showNav);
+				$fieldset2->add($f);
+			}
+		
+			/** @var InputfieldRadios $f */
+			$f = $this->modules->get('InputfieldRadios');
+			$f->attr('name', 'form_partialEntryType'); 
+			$f->label = $this->_('Pagination storage type');
+			$f->description = 
+				$this->_('How user input from each pagination is saved until form is ready to submit.') . ' ' . 
+				$this->_('The “database” option is recommended if the form has file upload fields or if it might take the user multiple sessions to complete the form.');
+			$f->notes = 
+				sprintf(
+					$this->_('When using the “session” option, if a user’s IP address might change between paginations, it’s a good idea to [disable](%s) “sessionFingerprint” in /site/config.php.'),
+					'https://processwire.com/api/ref/config/#pwapi-methods-session'
+				). ' ' . 
+				$this->_('When using the “database” option, it is preferable to check the box to disable session tracking/CSRF (see further below).');
+			$f->addOption(0, $this->_('Session') . $defaultLabel);
+			$f->addOption(1, $this->_('Database')); 
+			$f->attr('value', (int) $form->partialEntryType); 
+			$fieldset2->add($f);
+			
+			/** @var InputfieldInteger $field */
+			$field = $this->modules->get('InputfieldInteger');
+			$field->attr('id+name', 'form_partialEntryDays');
+			$field->label = $this->_('Delete partial entries from database after how many days of inactivity?');
+			$field->description = $this->_('Partial entries are form submissions that have started but not yet finished. Incomplete entries should be deleted after some period of time.'); // Description for partialEntryDays
+			$field->notes = $this->_('Specify a value of 1 or more days. If omitted or 0, 14 days is assumed.');
+			$value = $form->get('partialEntryDays');
+			if(!$value) $value = 14;
+			$field->attr('value', (int) $value);
+			$field->showIf = 'form_partialEntryType=1';
+			$fieldset2->add($field);
+		}
+
+		// -------------------
+		
+		/** @var InputfieldFieldset $fieldset2 */
+		$fieldset2 = $this->modules->get('InputfieldFieldset');
+		$fieldset2->label = $this->_('Form toggles');
+		$fieldset2->set('themeOffset', 1);
+		$fieldset2->icon = 'toggle-on';
+		$fieldset->add($fieldset2);
+		
+		// -------------------
+	
+		if(!$formInclude) {
+
+			$field = $this->modules->get("InputfieldCheckbox");
+			$field->attr('id+name', 'form_allowPreset');
+			$field->label = $this->_('Preset field values from GET variables?'); // allowPreset label
+			$field->description = $this->_('When checked, if a GET variable is present with the same name as a form field, the form field will be preset with the value from it.'); // allowPreset description
+			$field->attr('value', 1);
+			if($form->allowPreset) {
+				$field->attr('checked', 'checked');
+			} else {
+				$field->collapsed = Inputfield::collapsedYes;
+			}
+			$fieldset2->add($field);
+		}
+
+		// -------------------
+
+		if(!$formInclude) {
+			$field = $this->modules->get("InputfieldCheckbox");
+			$field->attr('id+name', 'form_skipSessionKey');
+			$field->label = $this->_('Disable session tracking and CSRF protection?');
+			$field->description = $this->_('When checked, Form Builder will accept all submissions, rather than trying to match them up to the user that saw the form. It is safest to leave this un-checked (the default), as it can help to reduce spam and prevents against CSRF (cross site request forgery). If you don\'t want to rely on sessions, are caching your form output, or sending submissions to another processing script, then you should check this box to disable session tracking.'); // skipSessionKey description
+			$field->attr('value', 1);
+			if($form->skipSessionKey) {
+				$field->attr('checked', 'checked');
+			} else {
+				$field->collapsed = Inputfield::collapsedYes;
+			}
+			$fieldset2->add($field);
+		}
+
+		// -------------------
+		if(!$formInclude) {
+			$field = $this->modules->get("InputfieldCheckbox");
+			$field->attr('id+name', 'form_useCookies');
+			$field->label = $this->_('Remember entered form field values on every change?');
+			$field->description = $this->_('When checked, form values will save to a cookie on every field change, even before submission. This means the user can navigate away from the form and anything they entered will still be there when they come back.'); // useCookies description
+			$field->notes = $this->_('This setting should only be used with single-page (non-paginated) forms.'); 
+			$field->attr('value', 1);
+			if($form->useCookies) {
+				$field->attr('checked', 'checked');
+			} else {
+				$field->collapsed = Inputfield::collapsedYes;
+			}
+			$fieldset2->add($field);
+		}
+		
+		// -------------------
+		
+		$field = $this->modules->get("InputfieldCheckbox");
+		$field->attr('id+name', 'form_flagInclude'); 
+		$field->label = $this->_('Is this form exclusively for including in other forms?'); 
+		$field->description = 
+			$this->_('One form can include another by adding a field of type “form”.') . ' ' . 
+			$this->_('If the only purpose of this form is to be included from another form, checking this box will improve efficiency by disabling some unnecessary features.');
+		$field->notes = 
+			$this->_('When using this option, you might also want to disable the form as well (see below).'); 
+		$field->attr('value', 1); 
+		if($form->hasFlag(FormBuilderProcessor::formFlagInclude)) {
+			$field->attr('checked', 'checked');
+		} else {
+			$field->collapsed = Inputfield::collapsedYes;
+		}
+		$fieldset2->add($field);
+		
+		// -------------------
+		
+		$field = $this->modules->get("InputfieldCheckbox");
+		$field->attr('id+name', 'form_flagDisabled');
+		$field->label = $this->_('Disable this form from being rendered and processed?');
+		$field->description = 
+			$this->_('A disabled form will not render or accept new entries, *except* if user has access to edit it OR if included from another form.') . ' ' . 
+			$this->_('Disabled forms also do not appear in the drop-down navigation, but do on the main forms list page.'); 
+			
+		$field->attr('value', 1);
+		if($form->hasFlag(FormBuilderProcessor::formFlagDisabled)) {
+			$field->attr('checked', 'checked');
+		} else {
+			$field->collapsed = Inputfield::collapsedYes;
+		}
+		$fieldset2->add($field);
+		
+		$field = $this->modules->get("InputfieldCheckbox");
+		$field->attr('id+name', 'form_flagNoModal');
+		$field->label = $this->_('Disable use of modal windows in FormBuilder admin?');
+		$field->description =
+			$this->_('When checked, the FormBuilder admin will stop using modal windows when editing fields and elsewhere.'); 
+
+		$field->attr('value', 1);
+		if($form->hasFlag(FormBuilderProcessor::formFlagNoModal)) {
+			$field->attr('checked', 'checked');
+		} else {
+			$field->collapsed = Inputfield::collapsedYes;
+		}
+		$fieldset2->add($field);
+
+
+		// -------------------
+		
+		if($this->forms->hasPermission('form-delete', $form)) {
+			$field = $this->modules->get("InputfieldCheckbox"); 
+			$field->label = $this->_('Delete form'); 
+			$field->description = $this->_('Warning: this will delete the form and all results.'); 
+			$field->attr('id+name', 'form_delete'); 
+			$field->attr('value', $form->id); 
+			$field->collapsed = Inputfield::collapsedYes; 
+			$field->icon = 'trash-o';
+			$fieldset->add($field);
+		}
+		
+		// -------------------
+
+		$field = $this->modules->get("InputfieldSubmit"); 
+		$field->attr('id', 'submit_save_form_settings');
+		$field->attr('name', 'submit_save_form'); 
+		$field->attr('value', $this->labels('save'));
+		$fieldset->add($field); 
+
+		return $fieldset; 
+	}
+
+	/**
+	 * Actions tab
+	 *
+	 * @param FormBuilderForm $form 
+	 * @return InputfieldWrapper
+	 * 
+	 */
+	protected function buildEditFormActionsSpam(FormBuilderForm $form) {
+
+		/** @var InputfieldWrapper $fieldsetSpam */
+		$fieldsetSpam = $this->modules->get('InputfieldFieldset'); 
+		$fieldsetSpam->description = $this->_('Please configure one or more spam prevention measures below.'); 
+		$fieldsetSpam->attr('id', 'fieldsetSpam'); 
+		$fieldsetSpam->collapsed = Inputfield::collapsedYes; 
+
+		/** @var InputfieldSelect $field */
+		$field = $this->modules->get("InputfieldSelect"); 	
+		$field->attr('id+name', 'form_honeypot'); 
+		$field->label = $this->_('Honeypot');
+		$field->required = false;
+		$field->addOption('');
+		foreach($this->fieldNames as $name) $field->addOption($name);
+		$field->description = $this->_('Select any existing field in your form that you want to serve as a honeypot field. When the field is populated in a form submission, it is assumed to be spam and the entire form is silently discarded, while appearing successful in the output. Honeypot fields are hidden with CSS (automatically by the Form Builder) so that real users do not see them.'); // Honeypot description
+		$field->notes = $this->_('Use of a honeypot field is an optional type of spam prevention. We ask you to select your own field so that the name and type of the honeypot field is less predictable across forms, which makes it more effective. A textarea or text field (placed near the top of the form) is preferable for honeypots.'); // Honeypot notes
+		$field->notes .= ' ' . $this->_('Please note: The honeypot field must not be populated, so make sure you have not set an initial value. Also, do not choose field names that that might be populated by web-browser auto-fill functions.'); // Honeypot notes 2
+		$field->attr('value', $form->honeypot ? $form->honeypot : ''); 
+		$field->collapsed = Inputfield::collapsedBlank;
+		$fieldsetSpam->add($field); 
+
+		$field = $this->modules->get("InputfieldTextarea"); 	
+		$field->attr('id+name', 'form_turingTest'); 
+		$field->label = $this->_('Turing Test');
+		$field->description = $this->_('In order to confirm that a form submission is real, you may want to add a field asking a simple question like "What is 2+1?" Then you can accept or deny the form submission based on the answer. Enter the name of an existing field in your form and the required answer in this format: "field=answer". You may specify more than one "field=answer" condition if necessary, but each should be on a separate line.'); // Turing test description
+		$field->notes = $this->labels('example') . ' ' . $this->_('my_test=3'); // Turing test example
+		$field->set('rows', 3); 
+		$field->collapsed = Inputfield::collapsedBlank;
+		$value = '';
+		if(is_array($form->turingTest)) foreach($form->turingTest as $k => $v) $value .= "$k=$v\n";
+		$field->attr('value', trim($value));  
+		$fieldsetSpam->add($field); 
+
+		/** @var InputfieldWrapper $akismet */
+		$akismet = $this->modules->get("InputfieldFieldset"); 	
+		$akismet->label = $this->_('Akismet');
+		if($this->wire('modules')->get('FormBuilder')->akismetKey) {
+			$akismet->collapsed = Inputfield::collapsedNo;
+			$akismet->description = $this->_('Akismet is a subscription service that monitors comment/form submissions for spam. In order to use this service you have to match up some of your fields with those that Akismet is expecting (which are based on blog comments).'); // Akismet description
+			$akismet->notes = $this->_('In order for Akismet to be enabled, a field must be selected for each of items above.'); // Akismet notes
+			$values = explode(',', $form->akismet); // CSV
+			$labels = array($this->_x('Name', 'akismet-name'), $this->_x('Email', 'akismet-email'), $this->_x('Message', 'akismet-message')); 
+			foreach($labels as $n => $key) {
+				$f = $this->wire('modules')->get('InputfieldSelect'); 
+				$f->attr('name', "akismet$key"); 
+				$f->label = sprintf($this->_("Field with person's %s"), strtolower($key));
+				$f->columnWidth = 33; 
+				$f->addOption('');
+				foreach($this->fieldNames as $name) $f->addOption($name);
+				$f->attr('value', isset($values[$n]) ? $values[$n] : '');
+				$akismet->add($f);
+				if(!$f->attr('value')) $akismet->collapsed = Inputfield::collapsedYes; 
+			}
+		} else {
+			$akismet->description = $this->_('This feature is not available because you do not have an Akismet API key defined. For more information, go to the Form Builder module settings.'); // Akismet description, when not available
+			$akismet->collapsed = Inputfield::collapsedYes; 
+			$f = $this->wire('modules')->get('InputfieldHidden');
+			$f->attr('name', 'form_akismet');
+			$f->attr('value', 0);
+			$akismet->add($f);
+		}
+		$fieldsetSpam->add($akismet); 
+
+		return $fieldsetSpam; 
+	}
+
+	/**
+	 * Actions tab
+	 * 
+	 * @param FormBuilderForm $form
+	 * @return InputfieldWrapper
+	 *
+	 */
+	protected function buildEditFormActions(FormBuilderForm $form) {
+
+		$languages = $this->wire('languages'); 
+		$languageFields = array();
+
+		/** @var InputfieldWrapper $fieldset */
+		$fieldset = new InputfieldWrapper();
+		$fieldset->attr('id', 'fieldsetActions');
+		$fieldset->attr('class', $fieldset->attr('class') . ' WireTab'); 
+		$fieldset->attr('title', $this->_('Actions')); 
+		$settingsLabel = ''; // $this->_('Configure >') . ' ';
+
+		$flags = array(
+			FormBuilderProcessor::saveFlagFilterSpam => $this->_('Filter spam'),
+			FormBuilderProcessor::saveFlagDB => $this->_('Save to entries database'),
+			FormBuilderProcessor::saveFlagEmail => $this->_('Send an email to administrator(s)'),
+			FormBuilderProcessor::saveFlagResponder => $this->_('Send an auto-response email to submitter'),
+			FormBuilderProcessor::saveFlagAction2 => $this->_('Send duplicate copies to another URL or 3rd party service'), 
+			FormBuilderProcessor::saveFlagPage => $this->_('Save to ProcessWire pages'),
+			FormBuilderProcessor::saveFlagExternal => $this->_('Submit to another URL (bypassing Form Builder processing)'),
+			FormBuilderProcessor::saveFlagGoogleSheets => $this->_('Add new row in Google Sheets spreadsheet'),
+		);
+
+		/** @var InputfieldCheckboxes $field */
+		$field = $this->modules->get('InputfieldCheckboxes');
+		$field->attr('name', 'form_saveFlags');
+		// $field->label = $this->_('What should happen when the form is submitted?');
+		$field->label = $this->_('Select one or more form actions'); 
+		$field->notes = $this->_('Each action has required configuration settings. These will appear below after each box is checked.'); 
+		$field->icon = 'bell-o';
+		$field->set('themeOffset', 1);
+		$value = array(); 
+		foreach($flags as $key => $label) {
+			$field->addOption($key, $label);
+			if($form->saveFlags & $key) $value[] = $key;
+		}
+		$pluginActions = $this->wire()->modules->findByPrefix('FormBuilderProcessor', 2);
+		foreach($pluginActions as $moduleName => $moduleInfo) {
+			$field->addOption($moduleName, $moduleInfo['title']); 
+		}
+		foreach($form->pluginActions as $moduleName) {
+			if(isset($pluginActions[$moduleName])) $value[] = $moduleName;
+		}
+		if(!count($value)) $value[] = 1; 
+		$field->attr('value', $value); 
+		$fieldset->add($field);
+
+		// --------------------------------------
+
+		/** @var InputfieldWrapper $fieldsetSpam */
+		$fieldsetSpam = $this->buildEditFormActionsSpam($form);
+		$fieldsetSpam->label = $settingsLabel . $flags[FormBuilderProcessor::saveFlagFilterSpam];
+		$fieldsetSpam->icon = 'fire-extinguisher';
+		$fieldsetSpam->set('themeOffset', 1);
+		$fieldset->add($fieldsetSpam);
+
+		// --------------------------------------
+
+		/** @var InputfieldFieldset $fieldsetEntries */
+		$fieldsetEntries = $this->modules->get('InputfieldFieldset');
+		$fieldsetEntries->attr('id', 'fieldsetEntries');
+		$fieldsetEntries->label = $settingsLabel . $flags[FormBuilderProcessor::saveFlagDB];
+		$fieldsetEntries->icon = 'database';
+		$fieldsetEntries->collapsed = Inputfield::collapsedYes;
+		$fieldsetEntries->set('themeOffset', 1); 
+		$fieldset->add($fieldsetEntries);
+		
+		/** @var InputfieldAsmSelect $field */
+		$field = $this->modules->get("InputfieldAsmSelect"); 
+		$field->label = $this->_('Fields to display in entries list');
+		$field->description = $this->_('What fields do you want to show in the admin entries/results listings? The entry listings are what you see when viewing multiple entries together. You may want to include fields used for basic identification like name, location, etc.'); // Admin result listings description 
+		$field->attr('id+name', 'form_listFields'); 
+		foreach($this->fieldNames as $name) $field->addOption($name);
+		$field->attr('value', is_array($form->listFields) ? $form->listFields : array()); 
+		$fieldsetEntries->add($field);
+	
+		/** @var InputfieldInteger $field */
+		$field = $this->modules->get('InputfieldInteger');
+		$field->attr('id+name', 'form_entryDays'); 
+		$field->label = $this->_('Automatically delete entries after how many days?');
+		$field->description = $this->_('If you do not want entry data staying on the server indefinitely, you can optionally have FormBuilder automatically delete them after a certain number of days.'); // Description for entryDays
+		$field->notes = $this->_('0 = Never auto-delete entries. This maintenance runs once daily. To run it now, use the checkbox below.');
+		$field->attr('value', (int) $form->entryDays); 
+		$fieldsetEntries->add($field);
+	
+		/** @var InputfieldCheckbox $field */
+		$field = $this->modules->get('InputfieldCheckbox'); 
+		$field->attr('name', '_maintNow'); 
+		$field->label = $this->_('Run daily maintenance now'); 
+		$fieldsetEntries->add($field); 
+
+		// --------------------------------------
+
+		$emailCustomNotes = $this->_('To customize the email body, copy the template file %1$s into %2$s (creating the directory if not there already) and modify it to suit your needs.'); // Instructions for email customization
+		$ifBlankLabel = $this->_('If left blank “%s” will be used.');
+
+		/** @var InputfieldWrapper $fieldsetEmail */
+		$fieldsetEmail = $this->modules->get('InputfieldFieldset'); 
+		$fieldsetEmail->attr('id', 'fieldsetEmail');
+		$fieldsetEmail->label = $settingsLabel . $flags[FormBuilderProcessor::saveFlagEmail]; 
+		$fieldsetEmail->icon = 'envelope-o';
+		$fieldsetEmail->collapsed = Inputfield::collapsedYes;
+		$fieldsetEmail->set('themeOffset', 1);
+
+		$field = $this->modules->get("InputfieldTextarea"); 	
+		$field->attr('id+name', 'form_emailTo'); 
+		$field->attr('value', $form->emailTo); 
+		$field->label = $this->_('Email addresses to send form results to');
+		$field->description = $this->_('To email one person each form submission, simply enter their email below. To email multiple people, enter each email address on a separate line. You may conditionally email an address based on the value of a field by specifying: "field=value? your@email.com" (see examples below).');
+		$field->notes = $this->labels('example') . "\n" . 
+			$this->_('frontdesk@company.com') . "\n" . // email example 1
+			$this->_('inquiry_type=Sales? sales@company.com') . "\n" . // email example 2 
+			$this->_('inquiry_type=Support? help@company.com');  // email example 3 
+		$fieldsetEmail->add($field); 
+
+		$field = $this->modules->get("InputfieldEmail");
+		$field->attr('id+name', 'form_emailFrom2'); 
+		$field->label = $this->_('Email from address');
+		$field->description = $this->_('This should be an email address associated with your web server and/or SMTP account.');
+		$field->notes = $this->_('While you can use any email address here, using one that is an allowed sender ensures emails will not be misidentified as spam.');
+		if($this->forms->fromEmail) $field->notes .= " \n" . sprintf($ifBlankLabel, $this->forms->fromEmail);
+		if(strpos($form->emailFrom2, '@')) $field->attr('value', $form->emailFrom2); 
+		$fieldsetEmail->add($field); 
+
+		/** @var InputfieldSelect $field */
+		$field = $this->modules->get("InputfieldSelect"); 	
+		$field->attr('id+name', 'form_emailFrom'); 
+		$field->label = $this->_('Email reply-to address');
+		$field->required = false;
+		$field->addOption('');
+		foreach($this->fieldNames as $name) $field->addOption($name);
+		$field->description = $this->_('When emailing a form submission to you, we can optionally make the "reply-to" be an email address entered in the form (assuming you have an Email field present). Select which field will contain the submitter\'s email address.'); // Description for email from field
+		if(in_array($form->emailFrom, $this->fieldNames)) $field->attr('value', $form->emailFrom ? $form->emailFrom : ''); 
+		$fieldsetEmail->add($field); 
+
+		$field = $this->modules->get("InputfieldText"); 	
+		$field->attr('id+name', 'form_emailSubject'); 
+		$field->attr('value', $form->emailSubject ? $form->emailSubject : $this->_('Form Submission')); // Default e-mail subject
+		$field->label = $this->_('Subject line of email that gets sent to recipient(s)');
+		$fieldsetEmail->add($field); 
+
+		$field = $this->modules->get('InputfieldMarkup');
+		$field->label = $this->_('Email body'); 
+		$field->attr('value', sprintf($emailCustomNotes, 
+			'<u>/site/<b>modules</b>/FormBuilder/email-administrator.php</u>', '<u>/site/<b>templates</b>/FormBuilder/</u>'));
+		$field->collapsed = Inputfield::collapsedYes; 
+		$fieldsetEmail->add($field);
+	
+		/** @var InputfieldRadios $field */
+		$field = $this->modules->get('InputfieldRadios'); 
+		$field->attr('id+name', 'form_emailFiles'); 
+		$field->label = $this->_('How to handle uploaded files?');
+		$field->notes = '*' . $this->_('If supported by your WireMail module installation.'); 
+		$field->addOption(0, $this->_('Send http links to files in email'));
+		$field->addOption(1, $this->_('Send file attachments in email') . '*');
+		$field->attr('value', (int) $form->emailFiles); 
+		$field->optionColumns = 1;
+		if(!$form->emailFiles) $field->collapsed = Inputfield::collapsedYes;
+		$fieldsetEmail->add($field);
+		
+		$fieldset->add($fieldsetEmail); 
+		
+
+		// --------------------------------------
+
+		/** @var InputfieldWrapper $fieldsetResponder */
+		$fieldsetResponder = $this->modules->get('InputfieldFieldset'); 
+		$fieldsetResponder ->attr('id', 'fieldsetResponder');
+		$fieldsetResponder->label = $settingsLabel . $flags[FormBuilderProcessor::saveFlagResponder]; 
+		$fieldsetResponder->icon = 'envelope';
+		$fieldsetResponder->collapsed = Inputfield::collapsedYes;
+		$fieldsetResponder->set('themeOffset', 1);
+
+		/** @var InputfieldSelect $field */
+		$field = $this->modules->get("InputfieldCheckboxes"); 	
+		$field->attr('id+name', 'form_responderTo'); 
+		$field->label = $this->_('Field(s) that contain email address that autoresponder should send to');
+		$fieldNames = isset($this->fieldNamesByType['Email']) ? $this->fieldNamesByType['Email'] : $this->fieldNames;
+		$value = explode(',', $form->responderTo); 
+		// if for some reason a non-email field is already present, allow it to be retained
+		foreach($value as $name) {
+			if(!in_array($name, $fieldNames) && in_array($name, $this->fieldNames)) $fieldNames[] = $name;
+		}
+		foreach($fieldNames as $name) {
+			$field->addOption($name);
+		}
+		$field->attr('value', $value); 
+		$fieldsetResponder->add($field); 
+
+		$field = $this->modules->get("InputfieldEmail"); 	
+		$field->attr('id+name', 'form_responderFrom'); 
+		$field->label = $this->_('Responder from email');
+		$field->description = $this->_('Enter the email address that the auto-responder email will be from.'); 
+		$field->attr('value', $form->responderFrom);
+		$field->columnWidth = 50;
+		if($this->forms->fromEmail) {
+			$field->notes = sprintf($ifBlankLabel, $this->forms->fromEmail); 
+		}
+		$fieldsetResponder->add($field);
+		
+		$field = $this->modules->get("InputfieldText");
+		$field->attr('id+name', 'form_responderFromName');
+		$field->label = $this->_('Responder from name');
+		$field->description = $this->_('Company or person’s first/last name that responder email should appear “from”.');
+		$field->attr('value', $form->responderFromName);
+		$field->columnWidth = 50;
+		$fieldsetResponder->add($field);
+		
+		$field = $this->modules->get("InputfieldEmail");
+		$field->attr('id+name', 'form_responderReplyTo');
+		$field->label = $this->_('Responder reply-to email');
+		$field->description = $this->_('The address that will be replied to if user chooses to reply.');
+		$field->attr('value', $form->responderReplyTo);
+		$field->columnWidth = 50;
+		$fieldsetResponder->add($field); 
+
+		$field = $this->modules->get("InputfieldText"); 	
+		$field->attr('id+name', 'form_responderSubject'); 
+		$field->attr('value', $form->responderSubject ? $form->responderSubject : $this->_('Auto-Response')); // Default auto-responder e-mail subject
+		$field->label = $this->_('Subject line of the auto-responder email');
+		$field->columnWidth = 50;
+		$languageFields['responderSubject'] = $field; 
+		$fieldsetResponder->add($field); 
+
+		$field = $this->modules->get('InputfieldTextarea');
+		$field->attr('id+name', 'form_responderBody'); 
+		$field->attr('value', $form->responderBody); 
+		$field->label = $this->_('Auto-responder email body'); 
+		$field->description = $this->_('To output the value of a form field in this email, enter the field name in [brackets]. For example: [first_name]'); 
+		$field->notes = sprintf($emailCustomNotes, '/site/modules/FormBuilder/email-autoresponder.php', '/site/templates/FormBuilder/');
+		$field->collapsed = Inputfield::collapsedBlank; 
+		$languageFields['responderBody'] = $field; 
+		$fieldsetResponder->add($field);
+		$fieldset->add($fieldsetResponder); 
+
+		// --------------------------------------
+
+		/** @var InputfieldWrapper $fieldset2 */
+		$fieldset2 = $this->wire('modules')->get('InputfieldFieldset');
+		$fieldset2->attr('id', 'fieldset3rdParty');
+		$fieldset2->label = $settingsLabel . $flags[FormBuilderProcessor::saveFlagAction2];
+		$fieldset2->description = $this->_('Share submitted form data with other services by cross posting the submitted data to another URL and optionally modifying what gets submitted.'); // 3rd party services description
+		$fieldset2->icon = 'copy';
+		$fieldset2->collapsed = Inputfield::collapsedYes;
+		$fieldset2->set('themeOffset', 1);
+
+		$field = $this->wire('modules')->get('InputfieldText'); 
+		$field->attr('id+name', 'form_action2');
+		$field->attr('value', $form->action2 ? $form->action2 : '');
+		$field->label = $this->_('Duplicate Submission URL');
+		$field->description = $this->_('If you want to duplicate the form submission by posting to another URL, enter the URL below. Then hit save and additional fields will appear here for you to complete.'); // Duplicate submission URL description
+		$fieldset2->add($field); 
+
+		$field = $this->wire('modules')->get('InputfieldTextarea');
+		$field->attr('id+name', 'form_action2_add'); 
+		$field->label = $this->_('Add Fields');
+		$field->description = $this->_('If there are any fields you want to add to the duplicate submission, enter one per line below in the format: [my_field_name]=[my_value]'); // Duplicate submission URL - add fields description
+		$field->notes = $this->labels('example') . "\n" . 
+			$this->_('oid=1234567') . "\n" . // Add fields example 1
+			$this->_('lead_source=Inquiry Form'); // Add fields example 2
+		$field->collapsed = Inputfield::collapsedBlank;
+		$value = '';
+		if(is_array($form->action2_add)) foreach($form->action2_add as $k => $v) $value .= "$k=$v\n";
+		$field->attr('value', trim($value)); 
+		$fieldset2->add($field);
+
+		$field = $this->wire('modules')->get('InputfieldTextarea');
+		$field->attr('id+name', 'form_action2_remove'); 
+		$field->label = $this->_('Remove Fields');
+		$field->description = $this->_('If there are any fields you want to remove from the duplicate submission, enter the names of these fields below (1 per line), and they will not be sent.'); // Duplicate submission URL - remove fields description
+		$field->collapsed = Inputfield::collapsedBlank;
+		$value = '';
+		if(is_array($form->action2_remove)) foreach($form->action2_remove as $v) $value .= "$v\n";
+		$field->attr('value', trim($value));
+		$fieldset2->add($field);
+
+		$field = $this->wire('modules')->get('InputfieldTextarea');
+		$field->attr('id+name', 'form_action2_rename'); 
+		$field->label = $this->_('Rename Fields');
+		$field->description = $this->_('If there are any fields you want to change the name of in the duplicate submission, enter one per line below in the format: [field_name]=[new_field_name]'); // Duplicate submission URL - rename fields description
+		$field->notes = $this->labels('example') . "\n" . 
+			$this->_('first_name=firstname') . "\n" . // Rename fields example 1
+			$this->_('email_address=email'); // Rename fields example 2
+		$field->collapsed = Inputfield::collapsedBlank;
+		$value = '';
+		if(is_array($form->action2_rename)) foreach($form->action2_rename as $k => $v) $value .= "$k=$v\n";
+		$field->attr('value', trim($value)); 
+		$fieldset2->add($field);
+		$fieldset->add($fieldset2); 
+
+		// --------------------------------------
+
+		/** @var InputfieldWrapper $fieldsetSavePage */
+		$fieldsetSavePage = $this->buildEditFormActionsSavePage($form);
+		$fieldsetSavePage->label = $settingsLabel . $flags[FormBuilderProcessor::saveFlagPage]; 
+		$fieldsetSavePage->icon = 'save';
+		$fieldsetSavePage->set('themeOffset', 1);
+		$fieldset->add($fieldsetSavePage); 
+
+		// --------------------------------------
+
+		/** @var InputfieldWrapper $fieldset2 */
+		$fieldset2 = $this->wire('modules')->get('InputfieldFieldset');
+		$fieldset2->attr('id', 'fieldsetSubmitTo');
+		$fieldset2->label = $settingsLabel . $flags[FormBuilderProcessor::saveFlagExternal]; 
+		$fieldset2->description = $this->_('Modify the default behavior of where the form is submitted.');
+		$fieldset2->icon = 'external-link';
+		$fieldset2->set('themeOffset', 1);
+		$fieldset2->collapsed = Inputfield::collapsedYes; 
+
+		$field = $this->wire('modules')->get('InputfieldText'); 
+		$field->attr('id+name', 'form_action');
+		$field->attr('value', $form->action ? $form->action : '');
+		$field->label = $this->_('Form Submit URL');
+		$field->description = $this->_('The URL that you want the form to submit to, should you need it. Leave blank or "./" to have FormBuilder process your forms.'); // Form submit URL, description
+		$field->collapsed = (!$form->action || $form->action == './') ? Inputfield::collapsedYes : Inputfield::collapsedNo; 
+		$fieldset2->add($field); 
+
+		/** @var InputfieldRadios $field */
+		$field = $this->wire('modules')->get('InputfieldRadios'); 
+		$field->attr('id+name', 'form_method'); 
+		$field->addOption('post', $this->_('POST')); // POST submit method label
+		$field->addOption('get', $this->_('GET')); // GET submit method label
+		$field->attr('value', $form->method == 'get' ? 'get' : 'post'); 
+		$field->label = $this->_('Form Submit Method');
+		$field->description = $this->_('The POST method is required if you want FormBuilder to process your results. If you planning to have this form submit somewhere else, then the GET method is provided, should you need it.'); // Submit method description
+		$field->collapsed = $field->attr('value') == 'post' ? Inputfield::collapsedYes : Inputfield::collapsedNo;
+		$fieldset2->add($field);
+
+		$field = $this->wire('modules')->get('InputfieldText'); 
+		$field->attr('id+name', 'form_target');
+		$field->attr('value', $form->target ? $form->target : '');
+		$field->label = $this->_('Form Submit Target');
+		$field->description = $this->_('The name of the target window for the form submission. Leave blank for default behavior. Examples include "_blank", "_parent", "_top" or the name of a frame.'); // Submit target description
+		$field->collapsed = Inputfield::collapsedBlank; 
+		$fieldset2->add($field); 
+
+		$fieldset->add($fieldset2);
+		
+		// --- GoogleSheets action -------------------------
+
+		/** @var InputfieldWrapper $fieldset2 */
+		$fieldset2 = $this->wire('modules')->get('InputfieldFieldset');
+		$fieldset2->attr('id', 'fieldsetGoogleSheets');
+		$fieldset2->label = $settingsLabel . $flags[FormBuilderProcessor::saveFlagGoogleSheets];
+		$fieldset2->description = sprintf(
+			$this->_('To use this feature you must have the [GoogleClientAPI](%1$s) module installed and configured with [%2$s](%3$s) scope.'),
+			'https://github.com/ryancramerdesign/GoogleClientAPI',
+			'https://www.googleapis.com/auth/spreadsheets',
+			'https://developers.google.com/identity/protocols/googlescopes#sheetsv4'
+		) . ' ';
+		if($this->wire('modules')->isInstalled('GoogleClientAPI')) {
+			$fieldset2->description .= '**' . $this->_('The GoogleClientAPI module IS installed.') . '**';
+		} else {
+			$fieldset2->description .= '**' . $this->_('The GoogleClientAPI module is NOT currently installed, so this feature is not available.') . '**';
+		}
+		$fieldset2->icon = 'google';
+		$fieldset2->set('themeOffset', 1);
+		$fieldset2->collapsed = Inputfield::collapsedYes; 
+		$fieldset->add($fieldset2); 
+		
+		$f = $this->wire('modules')->get('InputfieldText');
+		$f->attr('name', 'form_googleSpreadsheetUrl');
+		$f->attr('value', $form->googleSpreadsheetUrl); 
+		$f->label = $this->_('Google Sheets Spreadsheet');
+		$f->description = $this->_('Enter an existing Google Sheets spreadsheet URL or type in a title for a new spreadsheet to create.'); 
+		$f->appendMarkup =
+			"<ul><li><p>" .
+			'<strong>' . $this->_('To create a new spreadsheet:') . '</strong><br />' .
+			$this->_('Type in the title that you want to use for the new spreadsheet and we will attempt to create it now and populate the URL for you.') .
+			"</p></li><li><p>" . 
+			"<strong>" . $this->_('To use an existing spreadsheet:') . '</strong><br />' . 
+			$this->_('Open the Google Sheets spreadsheet that you want form submissions to append rows to.') . ' ' . 
+			$this->_('Makes sure you are on the intended sheet/tab.') . ' ' .
+			$this->_('Copy the URL in the address bar and paste it in here.') . ' ' . 
+			$this->_('The spreadsheet URL should look similar to the example below:') . 
+			"</p><p>" . 
+			"<code>https://docs.google.com/spreadsheets/d/<u>1W70v0JPXaFYLK6TfihhKgjWzFqS3OPnQ_V5mdalPcs</u>/edit#gid=<u>123</u></code><br />" .
+			"<span class='detail'>" . 
+			$this->_('In the above URL, the underlined portions are the: 1) spreadsheet ID; and 2) optional sheet/tab ID (also known as gid).') . 
+			"</span>" . 
+			"</p></li></ul>";
+		$fieldset2->add($f);
+	
+		/** @var InputfieldAsmSelect $f */
+		$f = $this->modules->get("InputfieldAsmSelect");
+		$f->attr('id+name', 'form_googleSpreadsheetFields');
+		$f->label = $this->_('Fields/order to populate in Google Sheets');
+		$f->description = 
+			$this->_('The fields you select here will populate a row in the spreadsheet.') . ' ' . 
+			$this->_('Drag your selections to the intended column order.') . ' ' . 
+			$this->_('If you need any blank columns, select one of the the “Blank/placholder” options for those positions.');
+		
+		$optgroups = array(
+			$this->_('Fields') => $this->fieldLabels,
+			$this->_('System') => array(
+				'created' => $this->_('Date/time form submitted (ISO-8601)'),
+				'entryID' => $this->_('Saved entry ID'),
+				'_savePage' => $this->_('Saved page ID'),
+				'_formName' => $this->_('Form name'),
+				'_pageTitle' => $this->_('Page title'),
+				'_pageName' => $this->_('Page name'),
+				'_pageURL' => $this->_('Page URL'),
+				'_pageID' => $this->_('Page ID'),
+				'_userID' => $this->_('User ID'),
+				'_userName' => $this->_('User name'),
+				'_userIP' => $this->_('User IP address'),
+			),
+		);
+		foreach($optgroups as $optgroupLabel => $options) {
+			foreach($options as $name => $label) {
+				if(strpos($name, '_') !== 0) $label .= " ($name)";
+				$f->addOption($name, "$optgroupLabel > $label");
+			}
+		}
+
+		$value = is_array($form->googleSpreadsheetFields) ? $form->googleSpreadsheetFields : array();
+		$numBlanks = 10;
+		foreach($value as $v) if(strpos($v, '_blank') === 0) $numBlanks++; // make sure always 10 additional blank options selectable
+		$blankLabel = $this->_('[blank]');
+		for($n = 0; $n < $numBlanks; $n++) $f->addOption("_blank$n", $blankLabel);
+		$f->attr('value', $value); 
+		$fieldset2->add($f);
+	
+		/** @var InputfieldSelect $f */
+		$f = $this->modules->get('InputfieldSelect');
+		$f->attr('id+name', 'form_googleSheetsResponseField'); 
+		$f->label = $this->_('Optional field to store Google Sheets response in form submissions');
+		$f->description = $this->_('This can be any text field (hidden or otherwise) and it will store the range of rows updated in the spreadsheet.'); 
+		foreach($this->fieldNames as $fieldName) {
+			$f->addOption($fieldName);
+		}
+		$f->attr('value', (string) $form->googleSheetsResponseField); 
+		$fieldset2->add($f);
+	
+		/** @var InputfieldCheckbox $f */
+		$f = $this->wire('modules')->get('InputfieldCheckbox');
+		$f->attr('name', '_googleSpreadsheetTest'); 
+		$f->label = $this->_('Test Google Sheets spreadsheet now'); 
+		$f->label2 = $this->_('Append row of column labels to spreadsheet');
+		$f->description = 
+			$this->_('Check this box to test appending a row of the field/column labels to your spreadsheet.') . ' ' . 
+			$this->_('This is a good way to test and make sure that the connection to your spreadsheet is working.') . ' ' . 
+			$this->_('This will also help you to make sure the columns are in the right order relative to any existing column headings.') . ' ' . 
+		$f->notes = $this->_('For new spreadsheets, this is a good way to add the first row (for column headings).'); 
+		$fieldset2->add($f);
+		
+		// ----------------------------
+		
+		foreach($pluginActions as $moduleName => $moduleInfo) {
+			/** @var InputfieldWrapper $fieldset2 */
+			$fieldset2 = $this->wire('modules')->get('InputfieldFieldset');
+			$fieldset2->attr('id+name', 'fieldset' . $moduleName);
+			$fieldset2->label = $settingsLabel . $moduleInfo['title'];
+			$fieldset2->description = $moduleInfo['summary'];
+			$fieldset2->showIf = "form_saveFlags=$moduleName";
+			$fieldset2->themeOffset = 1;
+			$fieldset2->icon = empty($moduleInfo['icon']) ? 'plug' : $moduleInfo['icon'];
+			$fieldset2->collapsed = Inputfield::collapsedYes;
+			$fieldset2->addClass('pwfb-plugin-action');
+			$fieldset->add($fieldset2);
+			
+			if(!in_array($moduleName, $form->pluginActions)) {
+				$fieldset2->notes = $this->_('Please save and then return here to configure this action.');
+				continue;
+			}
+			
+			/** @var FormBuilderProcessorAction $module */
+			$module = $this->wire()->modules->getModule($moduleName); 
+			if(!$module instanceof FormBuilderProcessorAction) continue;
+			$values = $form->get($moduleName);
+			if(!is_array($values)) $values = array();
+			$module->setArray($values);
+			$module->fbForm($form); 
+			$module->getConfigInputfields($fieldset2);
+			if(!$fieldset2->children()->count()) continue;
+			$inputs = array();
+			foreach($fieldset2->getAll() as $f) {
+				$namePrevious = $f->attr('name');
+				$inputs[$namePrevious] = $f;
+				$name = $moduleName . '_' . $namePrevious;
+				$f->attr('id+name', $name); 
+			}
+			// update any showIf or requiredIf conditions for renamed inputs
+			foreach($inputs as $name => $f) {
+				foreach(array('showIf', 'requiredIf') as $property) {
+					$value = $f->$property;
+					if(!$value) continue;
+					$names = implode('|', array_keys($inputs));
+					$f->$property = preg_replace('/\b(' . $names . ')\b/', $moduleName . '_$1', $value);
+				}
+				if($f->required) {
+					if($f->requiredIf) $f->requiredIf .= ', ';
+					$f->requiredIf .= "form_saveFlags=$moduleName";
+				}
+			}
+		}
+
+		// ----------------------------
+
+		$field = $this->modules->get("InputfieldSubmit"); 
+		$field->attr('id', 'submit_save_form_settings');
+		$field->attr('name', 'submit_save_form'); 
+		$field->attr('value', $this->labels('save'));
+		$fieldset->add($field); 
+
+		// ----------------------------
+
+		if($languages) foreach($languageFields as $name => $field) {
+			$field->useLanguages = true; 
+			foreach($languages as $language) {
+				/** @var Language $language */
+				if($language->isDefault()) continue; 
+				$key = $name . $language->id; 
+				$field->set("value$language", $form->$key); 
+			}
+		}
+
+		return $fieldset; 
+	}
+
+	/**
+	 * Output tab
+	 * 
+	 * @param FormBuilderForm $form
+	 * @return InputfieldWrapper
+	 *
+	 */
+	protected function buildEditFormOutput(FormBuilderForm $form) {
+
+		$fieldset = new InputfieldWrapper();
+		$fieldset->attr('title', $this->_('Output'));
+		$fieldset->attr('class', $fieldset->attr('class') . ' WireTab');
+
+		/** @var InputfieldSelect $field */
+		$field = $this->modules->get("InputfieldSelect");
+		$field->label = $this->_('Output Framework');
+		$field->description .= 
+			$this->_('Select the output framework you would like to use.') . ' ' . 
+			$this->_('Please save after changing this as additional framework-specific configuration options may appear below.');
+		//$field->notes = $this->_('*Avoid Admin and Legacy frameworks when using embed method C or D.');
+		$field->icon = 'rocket';
+		$field->attr('name', 'form_framework');
+		$field->columnWidth = 50; 
+		$field->required = true; 
+	
+		$helperPath = $this->forms->helperPath('frameworks');
+		foreach($this->forms->getHelpers('frameworks', false) as $file) {
+			if(!preg_match('/^(FormBuilderFramework(\w+))\.php$/', $file, $matches)) continue; 
+			include_once($helperPath . $file); 
+			$frameworkClass = __NAMESPACE__ . '\\' . $matches[1];
+			$frameworkName = $matches[2];
+			$frameworkLabel = rtrim($frameworkName, '0123456789');
+			if(method_exists($frameworkClass, 'getFrameworkVersion')) {
+				$frameworkVersion = $frameworkClass::getFrameworkVersion();
+				list($majorVersion, /* minorVersion */) = explode('.', $frameworkVersion, 2);
+				$frameworkVersion = "(v$majorVersion)";
+			} else {
+				$frameworkVersion = '';
+			}
+			if($frameworkName == 'Admin' || $frameworkName == 'Legacy') {
+				if($form->framework != 'Admin' && $form->framework != 'Legacy') continue; // don't show if they aren't already using
+				$frameworkLabel .= ' ' . $this->_('(deprecated)');
+			} else if($frameworkName == 'Basic') {
+				$frameworkLabel = $this->_('Default') . ' / ' . 
+					$this->_('Basic');
+			}
+			$field->addOption($frameworkName, "$frameworkLabel $frameworkVersion");
+		}
+		if(!$form->framework) $form->framework = 'Basic';
+		$field->attr('value', $form->framework);
+		$fieldset->add($field); 
+		
+		$field = $this->modules->get("InputfieldSelect"); 
+		$field->label = $this->_('jQuery UI Theme');
+		$field->description = $this->_('This affects the appearance of jQuery UI widgets like AsmSelect and Date/time date pickers. If no jQuery UI widgets are in use, it will not be loaded.'); 
+		$field->icon = 'camera-retro';
+		$field->attr('id+name', 'form_theme'); 
+		$field->showIf = 'form_framework!=Admin';
+		$field->addOption('basic', 'Basic');
+		foreach($this->forms->getHelpers('themes') as $file) {
+			if($file != 'basic') $field->addOption($file, ucfirst($file));
+		}
+		$field->attr('value', $form->theme); 
+		$field->columnWidth = 50; 
+		$fieldset->add($field);
+
+		/** @var FormBuilderFramework $framework */
+		$framework = $this->wire('forms')->getFramework($form);
+		if($framework) {
+			// configuration specific to framework
+			$prefix = $framework->getPrefix();
+			$frameworkInputfields = $framework->getConfigInputfields();
+			$frameworkInputfields->label .= ' (' . $framework->getFrameworkVersion() . ')';
+			$frameworkInputfields->showIf = 'form_framework=' . $form->framework;
+			if(!$frameworkInputfields->icon) $frameworkInputfields->icon = 'rocket';
+			$n = 0;
+			foreach($frameworkInputfields->getAll() as $f) {
+				// update name to have prefix
+				$name = $f->attr('name');
+				if($name) {
+					$f->attr('name', $prefix . $name);
+					$n++;
+				}
+			}
+			if($n) $fieldset->add($frameworkInputfields);
+		}
+
+		/** @var InputfieldText $field */
+		$field = $this->modules->get("InputfieldText");
+		$field->label = $this->_('Mobile breakpoint');
+		$field->description = $this->_('When screen width falls at or below this number of units, multi-column forms (whether stacked or horizontal) will break down to 1 column. This also overrides any framework-specific breakpoint settings.');
+		$field->description .= ' ' . $this->_('Specify 0 for default (which is somewhere around 480px). Specify 1 to have no mobile breakpoint. Or specify any quantity, optionally including type (i.e. px, em, rem, pt, etc). If no unit is specified, "px" is assumed.'); 
+		$field->notes = $this->_('Example: 480px'); 
+		$field->attr('id+name', 'form_mobilePx');
+		$field->attr('value', $form && $form->mobilePx ? $form->mobilePx : 0); 
+		$field->attr('size', 10); 
+		$field->icon = 'mobile-phone';
+		$fieldset->add($field);
+
+		/** @var InputfieldText $field */
+		$labelButtonText = $this->_('Label for “%s” button');
+		$labelSubmit = $this->_('Submit');
+		$field = $this->modules->get("InputfieldText"); 
+		$field->label = sprintf($labelButtonText, $labelSubmit);
+		$field->attr('id+name', 'form_submitText'); 
+		$field->attr('value', $form && $form->submitText ? $form->submitText : $labelSubmit);
+		$field->icon = 'check-circle';
+		$languageFields['submitText'] = $field;	
+		$fieldset->add($field);
+
+		if($form && $form->getNumPaginations() > 1) {
+			$notes = $this->_('Leave blank for automatic/default label.'); 
+			$field->columnWidth = 34;
+		
+			/** @var InputfieldText $field */
+			$field = $this->modules->get("InputfieldText");
+			$field->attr('id+name', 'form_nextText');
+			$field->label = sprintf($labelButtonText, $this->_('Next'));
+			$field->notes = $notes;
+			$field->icon = 'chevron-circle-right';
+			$field->attr('value', $form && $form->nextText ? $form->nextText : ''); // Default submit button text for forms
+			$field->columnWidth = 33;
+			$languageFields['nextText'] = $field;
+			$fieldset->add($field);
+			
+			/** @var InputfieldText $field */
+			$field = $this->modules->get("InputfieldText");
+			$field->attr('id+name', 'form_backText');
+			$field->label = sprintf($labelButtonText, $this->_('Back'));
+			$field->icon = 'chevron-circle-left';
+			$field->notes = $notes;
+			$field->attr('value', $form && $form->backText ? $form->backText : ''); // Default submit button text for forms
+			$field->columnWidth = 33;
+			$languageFields['backText'] = $field;
+			$fieldset->add($field);
+		}
+
+		$field = $this->modules->get("InputfieldTextarea"); 
+		$field->label = $this->_('Success Text or Redirect');
+		$field->icon = 'check-square';
+		$field->description = 
+			$this->_('1. To display a success message, enter the text that you want to display.') . " " . 
+				$this->_('To use Markdown or HTML, prepend the field with “markdown:” or “html:”.') . "\n" . 
+			$this->_('2. To redirect to another page, enter the path to the page. Using page ID is okay too.') . "\n" . 
+			$this->_('3. To display text from a field on another page, enter: /path/to/page/:field or id:field') . "\n" . 
+			$this->_('4. To redirect to a specific URL, enter the full URL prefixed with scheme of http:// or https://.'); 
+		$field->attr('id+name', 'form_successMessage'); 
+		$field->attr('value', $form->successMessage ? $form->successMessage : $this->_('Thank you, your form has been submitted.')); // Default thank you message after form submitted
+		$languageFields['successMessage'] = $field;	
+		$fieldset->add($field); 
+
+		$field = $this->modules->get("InputfieldText"); 
+		$field->label = $this->_('Error Message');
+		$field->icon = 'exclamation-triangle';
+		$field->description = $this->_('Enter the text you want to display on a submission error. This text will precede the form containing inline error messages.'); // Error message description
+		$field->attr('id+name', 'form_errorMessage'); 
+		$field->attr('value', $form->errorMessage ? $form->errorMessage : $this->_('One or more errors prevented submission of the form. Please correct and try again.')); // Default leading error message for forms
+		$languageFields['errorMessage'] = $field;	
+		$fieldset->add($field); 
+
+		$field = $this->modules->get("InputfieldSubmit"); 
+		$field->attr('id', 'submit_save_form_output');
+		$field->attr('name', 'submit_save_form'); 
+		$field->attr('value', $this->labels('save'));
+		$fieldset->add($field); 
+
+		$languages = $this->wire('languages'); 
+		if($languages) foreach($languageFields as $name => $field) {
+			$field->useLanguages = true; 
+			foreach($languages as $language) {
+				/** @var Language $language */
+				if($language->isDefault()) continue; 
+				$field->set("value$language", $form->get("$name$language")); 
+			}
+		}
+
+		return $fieldset; 
+	}
+
+	/**
+	 * Settings specific to savePage options
+	 * 
+	 * @param FormBuilderForm $form
+	 * @return InputfieldWrapper
+	 *
+	 */
+	protected function buildEditFormActionsSavePage($form) {
+
+		// fieldtypes that are not allowed to be populated on pages
+		$noFieldtypes = array(
+			'FieldtypeCache',
+			'FieldtypeComments',
+			'FieldtypeFieldsetOpen',
+			'FieldtypeFieldsetTabOpen',
+			'FieldtypeFieldsetClose',
+			'FieldtypeModule',
+			'FieldtypeRepeater',
+			);
+		
+		/** @var Templates $templates */	
+		$templates = $this->wire('templates');
+
+		/** @var InputfieldWrapper $fieldset */
+		$fieldset = $this->wire('modules')->get('InputfieldFieldset');
+		$fieldset->attr('id', 'fieldsetSavePage');
+		$fieldset->collapsed = Inputfield::collapsedYes; 
+
+		/** @var InputfieldSelect $field */
+		$field = $this->modules->get('InputfieldSelect'); 
+		$field->attr('id+name', 'form_savePageTemplate');
+		$field->label = $this->_('Page Template');
+		$field->description = $this->_('Select the template that should be used for pages created from form submissions.');
+		$field->notes = $this->_('Click "save" after selecting a template and return here for more options.'); 
+		
+		foreach($templates as $template) {
+			$field->addOption($template->id, $template->label ? "$template->label ($template->name)" : $template->name);
+		}
+		
+		$field->value = (int) $form->savePageTemplate; 
+		$fieldset->add($field); 
+
+		if($field->value) {
+			$savePageTemplate = $templates->get($field->value);
+		} else {
+			$savePageTemplate = null;
+		}
+
+		if(!($form->saveFlags & FormBuilderProcessor::saveFlagPage) || !$savePageTemplate) {
+			return $fieldset;
+		}
+
+		/** @var InputfieldPageListSelect $field */
+		$field = $this->modules->get('InputfieldPageListSelect'); 
+		$field->attr('id+name', 'form_savePageParent'); 
+		$field->attr('value', $form->savePageParent ? (int) $form->savePageParent : 0); 
+		$field->label = $this->_('Parent Page');
+		$field->description = $this->_('Form submissions will be created as children of this parent.');
+		$fieldset->add($field); 
+
+		$field = $this->modules->get('InputfieldMarkup');
+		$field->attr('id+name', 'savePageFields');
+		$field->label = $this->_('Page Fields to Form Fields');
+
+		if($savePageTemplate) { 
+			$savePageFields = is_array($form->savePageFields) ? $form->savePageFields : array();
+			$field->description = $this->_('Select the form fields that relate to each page field. All are optional.');
+			$icon = "<i class='fa fa-caret-right'></i> ";
+			/** @var MarkupAdminDataTable $table */
+			$table = $this->modules->get('MarkupAdminDataTable');
+			$table->setEncodeEntities(false);
+			$table->setSortable(false); 
+			$table->headerRow(array(
+				$this->_('Form Builder Field') . '&nbsp;', 
+				$this->_('ProcessWire Page Field'),
+				'&nbsp;'
+				)); 
+
+			// create the options
+			$options = '<option></option>';
+			foreach($form->getChildrenFlat() as $f) {
+				$options .= "<option value='{$f->name}'>{$f->name}</option>";
+			}
+	
+			// native fields	
+			foreach(array('name' => $this->_('If left blank, it will generate from the title instead.')) as $name => $notes) {	
+				$o = $options; 
+				if(isset($savePageFields[$name])) $o = str_replace("value='$savePageFields[$name]'", "value='$savePageFields[$name]' selected='selected'", $o);
+				$table->row(array("<select name='savePageFields_$name'>$o</select>", "&nbsp;$icon<b>$name</b>", "<span class='detail'>$notes</span>")); 
+			}
+
+			// determine which fields are allowed for this purpose
+			$fieldgroup = array();
+			foreach($savePageTemplate->fieldgroup as $f) {
+				$valid = true; 	
+				foreach($noFieldtypes as $t) {
+					if($f->type instanceof $t) $valid = false;
+				}
+				if($valid) $fieldgroup[] = $f;
+			}
+			
+			// custom fields
+			foreach($fieldgroup as $f) {
+				
+				$o = $options; 
+				if(isset($savePageFields["$f->id"])) {
+					// identify selected option
+					$o = preg_replace('/(value=\'' . $savePageFields["$f->id"] . '\')/', '$1 selected=\'selected\'', $o); 
+				}
+				$notes = '';
+				if($f->name == 'title') $notes = "<span class='detail'>" . $this->_('If left blank, a date/time stamp will be used.') . "</span>"; 
+				$table->row(array("<select name='savePageFields_{$f->id}'>$o</select>", "&nbsp;$icon<b>$f->name</b>", "$notes")); 
+			}
+			$field->attr('value', $table->render());
+			$field->notes = $this->_('Warning: Publishing directly to pages can be risky. Be extremely careful when outputting any page containing fields populated from form submissions. All output should be entity encoded, and this is your responsibility. If you have security questions or need help, please post in the Form Builder support forum.');
+			unset($options, $o, $table, $savePageFields, $icon);
+		} else {
+			$field->value = '<p>' . $this->_('You must select a parent and template above. Then save and come back here to configure the fields.') . '</p>';
+		}
+		$fieldset->add($field);
+
+		/** @var InputfieldRadios $field */
+		$field = $this->modules->get('InputfieldRadios');
+		$field->attr('id+name', 'form_savePageStatus'); 
+		$field->label = $this->_('Page Save Status'); 
+		$field->addOption(0, $this->_('Save submissions to pages manually from entries screen (recommended)'));
+		$field->addOption(Page::statusUnpublished, $this->_('Save submissions to UNPUBLISHED pages'));
+		$field->addOption(Page::statusHidden, $this->_('Save submissions to HIDDEN but PUBLISHED pages*'));
+		$field->addOption(Page::statusOn, $this->_('Save submissions to PUBLISHED pages*')); 
+		$field->attr('value', (int) $form->savePageStatus);
+		$field->notes = $this->_('*These options may be dangerous because they publish the submission to a URL accessible page, unless template permissions deny access. Ideally, you want to approve any form submissions before they are published to a page on the site. As a result, the first option is the safest.'); 
+		
+
+		$fieldset->add($field);
+		return $fieldset; 
+	}
+
+	/**
+	 * Build the 'access' tab of the form editor
+	 *
+	 * @param FormBuilderForm $form Form being edited. 
+	 * @return InputfieldWrapper
+	 *
+	 */
+	protected function buildEditFormAccess(FormBuilderForm $form) {
+
+		$labels = array(
+			'form-submit' => $this->_('Roles that can view and submit this form on your site'),
+			'form-list' => $this->_('Roles that can see the form in the admin'), 
+			'form-edit' => $this->_('Roles that can edit this form'),
+			'form-delete' => $this->_('Roles that can delete this form'),
+			'entries-list' => $this->_('Roles that can view and list entries for this form'),
+			'entries-edit' => $this->_('Roles that can edit entries for this form'),
+			'entries-delete' => $this->_('Roles that can delete entries for this form'),
+			'entries-page' => $this->_('Roles that can send entries to pages, when applicable'),
+			'entries-resend' => $this->_('Roles that can re-send an entry, when applicable'),
+			);
+
+		$fieldset = new InputfieldWrapper();
+		$fieldset->attr('id', 'ProcessFormBuilderAccess');
+		$fieldset->attr('title', $this->_x('Access', 'tab')); 
+		$fieldset->attr('class', 'WireTab');
+
+		foreach($form->roles as $permission => $roles) {
+
+			/** @var InputfieldCheckboxes $field */
+			$field = $this->modules->get('InputfieldCheckboxes'); 
+			$field->attr('name', 'roles_' . str_replace('-', '_', $permission));
+			$field->label = isset($labels[$permission]) ? $labels[$permission] : $permission;
+
+			$numOptions = 0;
+			foreach($this->wire('roles') as $role) {
+				$label = $role->name; 	
+				if($role->id == $this->wire('config')->superUserRolePageID) continue; 
+				if($permission != 'form-submit' && !$role->hasPermission('form-builder')) continue; 
+				if($role->id == $this->wire('config')->guestUserRolePageID) {
+					$label .= "*"; 
+					$field->notes = $this->_('*All other roles also gain access when guest is checked.');
+				}
+				$field->addOption($role->name, $label); 
+				$numOptions++;
+			}
+
+			if($numOptions) {
+				$field->attr('value', $roles);
+				$fieldset->add($field);
+			} else {
+				/** @var InputfieldMarkup $f */
+				$f = $this->modules->get('InputfieldMarkup');
+				$f->label = $field->label;
+				$f->value = '<p class="description">' . $this->_('No roles defined with form-builder permission') . '</p>';
+				$f->collapsed = Inputfield::collapsedYes; 
+				$fieldset->add($f);
+			}
+		}
+
+		$field = $this->modules->get("InputfieldSubmit"); 
+		$field->attr('id', 'submit_save_form_access');
+		$field->attr('name', 'submit_save_form'); 
+		$field->attr('value', $this->labels('save'));
+		$fieldset->add($field); 
+
+		return $fieldset; 
+	}
+
+	/**
+	 * Build the 'preview' tab of the form editor
+	 *
+	 * @param FormBuilderForm $form Form being edited. 
+	 * @return Inputfield
+	 *
+	 */
+	protected function buildEditFormPreview(FormBuilderForm $form) {
+		/** @var InputfieldMarkup $field */
+		$field = $this->modules->get("InputfieldMarkup"); 
+		$field->attr('id', 'ProcessFormBuilderView'); 
+		$field->attr('title', $this->_x('Preview', 'tab')); 
+		$field->attr('class', 'WireTab');
+		$field->attr('value', "<a href='" . $this->pages->get("template=" . FormBuilderMain::name)->url . $form->id . "/?preview=1'>preview</a>"); 
+		return $field; 
+	}
+
+	/**
+	 * Build the 'embed' tab of the form editor
+	 *
+	 * @param FormBuilderForm $form Form being edited. 
+	 * @return Inputfield
+	 *
+	 */
+	protected function buildEditFormEmbed(FormBuilderForm $form) {
+		if($form) {} // ignore
+
+		// $formBuilderPage = $this->pages->get("template=" . FormBuilderMain::name); 
+		/** @var InputfieldMarkup $field */
+		$field = $this->modules->get("InputfieldMarkup"); 
+		$field->attr('id', 'ProcessFormBuilderEmbed'); 
+		$field->attr('title', $this->_x('Embed', 'tab')); 
+		$field->attr('class', 'WireTab');
+		$field->label = $this->_('How to embed/install this form on your site');
+		$field->icon = 'paste';
+		$field->attr('value', "<div id='ProcessFormBuilderEmbedMarkup'><h2>" . $this->labels('loading') . '</h2></div>'); 
+
+		return $field;
+	}
+
+	/**
+	 * Build the 'export' tab of the form editor
+	 *
+	 * @param FormBuilderForm $form Form being edited. 
+	 * @return InputfieldWrapper
+	 *
+	 */
+	protected function buildEditFormExport(FormBuilderForm $form) {
+		if($form) {} // ignore
+
+		$wrapper = new InputfieldWrapper();
+		$wrapper->attr('id', 'ProcessFormBuilderExport'); 
+		$wrapper->attr('title', $this->_x('Import/Export', 'tab')); 
+		$wrapper->attr('class', 'WireTab');
+
+		/** @var InputfieldTextarea $field */
+		$field = $this->modules->get("InputfieldTextarea");
+		$field->attr('id', 'ProcessFormBuilderImportJSON');
+		$field->attr('name', '_import_json'); 
+		$field->class .= " code";
+		$field->label = $this->_('Import Data');
+		$field->icon = 'sign-in';
+		$field->rows = 3;
+		$field->description = 
+			$this->_('To import data from another form, paste in its JSON export data here and click the “Save” button.') . ' ' . 
+			$this->_('The next screen will let you select what fields to import.');
+		$wrapper->add($field);
+	
+		/** @var InputfieldSubmit $f */
+		$f = $this->modules->get('InputfieldSubmit');
+		$f->attr('id', 'ProcessFormBuilderImportButton');
+		$f->attr('name', 'submit_import');
+		$f->attr('value', $this->_('Continue to next step'));
+		$f->icon = 'sign-in';
+		$field->appendMarkup = "<p>" . $f->render() . "</p>";
+
+		/** @var InputfieldTextarea $field */
+		$field = $this->modules->get("InputfieldTextarea"); 
+		$field->attr('name+id', 'ProcessFormBuilderExportJSON'); 
+		$field->class .= " code";
+		$field->label = $this->_('Export Data');
+		$field->icon = 'sign-out';
+		$field->rows = 3;
+		$field->description = $this->_('Click in this field and copy the text. When creating a new form, you will be given the option to "import", at which point you may paste in this text.'); // Export data description
+		$wrapper->add($field);
+
+		if(version_compare($this->wire('config')->version, '3.0.132') >= 0) {
+			$field->notes = $this->_('If you prefer to download the export (rather than copy) click the button below.'); 
+			/** @var InputfieldButton $f */
+			$f = $this->modules->get('InputfieldButton');
+			$f->attr('id+name', 'ProcessFormBuilderExportButton');
+			$f->attr('value', $this->_('Download export file'));
+			$f->icon = 'cloud-download';
+			$f->href = "../exportForm?id=$form->id&download=1";
+			$field->appendMarkup = $f->render();
+		}
+
+		return $wrapper;
+	}
+
+	/**
+	 * Build the 'entries' tab of the form editor
+	 *
+	 * @param FormBuilderForm $form Form being edited. 
+	 * @return Inputfield
+	 *
+	 */
+	protected function buildEditFormEntries($form) {
+		if($form) {} // ignore
+		/** @var InputfieldMarkup $field */
+		$field = $this->modules->get('InputfieldMarkup'); 
+		$field->attr('id', 'ProcessFormBuilderEntries');
+		$field->attr('title', $this->_x('Entries', 'tab'));
+		$field->attr('class', 'WireTab');
+		$field->attr('value', '<span></span>');
+		return $field; 
+	}
+
+
+	/**
+	 * Execute the 'edit form' action
+	 *
+	 * @return string
+	 *
+	 */
+	public function ___executeEditForm() {
+		$id = (int) $this->input->get('id'); 
+		$editForm = $this->buildEditForm($id);
+		// $editForm->attr('title', $this->_x('Fields', 'headline'));
+		$editForm->attr('id', 'ProcessFormBuilder'); 
+		$out = $editForm->render();
+		return $out; 
+	}
+
+	/**
+	 * Execute the 'export' function which sends JSON data of a form (or a download)
+	 *
+	 * @return string JSON
+	 *
+	 */
+	public function ___executeExportForm() {
+		$id = (int) $this->input->get('id'); 
+		$form = $this->getForm($id, 'form-edit'); 
+		$download = (int) $this->wire()->input->get('download');
+		$json = $this->forms->exportJSON($id);
+		
+		if($download && version_compare($this->wire()->config->version, '3.0.132') >= 0) {
+			$http = new WireHttp();
+			$this->wire($http);
+			$http->sendFile(false, array(
+				'downloadFilename' => "forms-$form->name.json",
+				'forceDownload' => true, 
+				'data' => $json,
+				'exit' => true
+			));
+		}
+		
+		return $json;
+	}
+	
+	/**
+	 * Execute the 'import' process
+	 *
+	 * Requires the following POST variables:
+	 * - form_id (int)
+	 * - _import_json (string)
+	 * - _import_children (array) if submit_import_commit clicked
+	 * - _import_properties (array) if submit_import_commit clicked
+	 *
+	 * Expects one of the following submit buttons in POST:
+	 * - submit_import
+	 * - submit_import_commit
+	 *
+	 * @return string
+	 * @throws WireException
+	 * @throws WirePermissionException
+	 *
+	 */
+	public function executeImport() {
+
+		/** @var WireInput $input */
+		$input = $this->wire('input');
+		$id = (int) $input->post('form_id');
+		$form = $this->getForm($id, 'form-edit'); 
+		
+		$this->breadcrumb("../editForm/?id=" . $form->id, ucfirst($form->name));
+		$this->headline(sprintf('Import to form “%s”', $form->name));
+
+		include_once(__DIR__ . '/ProcessFormBuilderImport.php');
+		$import = new ProcessFormBuilderImport($form); 
+		
+		return $import->execute();
+	}
+
+
+	/**
+	 * Execute the 'embed' function which displays the contents of ProcessFormBuilderEmbed.php
+	 *
+	 * @return string
+	 *
+	 */
+	public function ___executeEmbedForm() {
+		$id = (int) $this->input->get('id'); 
+		if(!$id) return '';	
+		$form = null;
+		try { 
+			$form = $this->getForm($id, 'form-edit');
+		} catch(\Exception $e) {
+			if($e instanceof WirePermissionException) throw $e;
+		}
+		if(!$form) return '';
+		// /** @var TemplateFile|\ProcessWire\TemplateFile $t */
+		$t = new TemplateFile(dirname(__FILE__) . '/ProcessFormBuilderEmbed.php'); 
+		$t->set('form', $form); 
+		$t->set('embedTag', $this->forms->embedTag); 
+		return $t->render();
+	}
+
+	/**
+	 * Execute the 'add new form' action
+	 *
+	 * @return string
+	 * @throws WirePermissionException|WireException
+	 *
+	 */
+	public function ___executeAddForm() {
+
+		if(!$this->wire()->user->hasPermission('form-builder-add')) throw new WirePermissionException($this->labels('no-access')); 
+
+		$this->headline($this->_('Add New Form')); // Headline
+
+		/** @var InputfieldForm $editForm */
+		$editForm = $this->modules->get('InputfieldForm'); 
+		$editForm->attr('action', '../addForm/'); 
+
+		/** @var InputfieldName $field */
+		$field = $this->modules->get('InputfieldName'); 
+		$field->attr('id+name', 'form_name');
+		$editForm->add($field);
+
+		// @todo this option may need a separate permission setting
+		// it was previously limited to superuser but that was removed by multiple user requests
+		$field = $this->modules->get('InputfieldTextarea');
+		$field->attr('id+name', 'import_data'); 
+		$field->label = $this->_x('Import', 'field-label');
+		$field->description = $this->_('If you have data for an exported form, you may paste it in here to import it.'); // Import description
+		$field->collapsed = Inputfield::collapsedYes; 
+		$editForm->add($field); 
+
+		$field = $this->modules->get('InputfieldSubmit');
+		$field->attr('name', '_submit_add_form');
+		$editForm->add($field);
+
+		$formName = $this->sanitizer->pageName($this->input->post('form_name'), Sanitizer::translate);
+		$formName = str_replace('.', '_', $formName); 
+		if($this->forms->isReservedName($formName)) $formName .= '_';
+
+		if($formName) {
+			$form = null;
+			$error = '';
+			try {
+				$form = $this->forms->addNew($formName);
+				if(!$form->id) $error = $this->_('Unknown error adding form');
+			} catch(\Exception $e) {
+				if($e->getCode() == 23000) {
+					$error = $this->_('A form with that name already exists, please try another.');
+				} else {
+					$error = $e->getMessage();
+				}
+			}
+			
+			if($error) {
+				$this->error($error);
+				$this->wire()->session->redirect('./'); 
+			}
+
+			// add current user's role with form-builder-add permission to all permissions on this form
+			foreach($this->wire('user')->roles as $role) {
+				if(!$role->hasPermission('form-builder-add')) continue; 
+				$roles = $form->roles; 
+				foreach($roles as $name => $value) {
+					if($name == 'form-submit') continue;  // comes with guest access already
+					$roles[$name] = array($role->name);
+				}
+				$form->roles = $roles; 
+				$form->save();
+				break;
+			}
+
+			$this->message(sprintf($this->_('Added form: %s'), $formName)); 
+			$json = $this->input->post('import_data'); 
+			if(strlen(trim($json))) { // && wire('user')->isSuperuser()) {
+				if($this->forms->importJSON($form->id, $json)) $this->message($this->_('Imported form data')); 
+					else $this->error($this->_('Error importing form data'));
+			}
+			$this->session->redirect("../editForm/?id={$form->id}"); 
+			return '';
+		}
+	
+		return $editForm->render();	
+	}
+
+	/**
+	 * Execute the 'save form' action
+	 *
+	 * This handles the saving of all data for executeEditForm and also looks for fields being added.
+	 * Once complete, it redirects back to editForm.
+	 *
+	 * @return string
+	 * @throws WireException|WirePermissionException
+	 *
+	 */
+	public function ___executeSaveForm() {
+	
+		/** @var WireInput $input */
+		$input = $this->wire('input');
+		$id = (int) $input->post('form_id'); 	
+		$form = $this->getForm($id, 'form-edit'); 
+		$redirectUrl = "../editForm/?id=$id";
+		$formDelete = (int) $input->post('form_delete');
+		$ajaxSaveProperty = $input->post->fieldName('save_property');
+		$formInclude = $form->hasFlag(FormBuilderProcessor::formFlagInclude);
+		
+		if($ajaxSaveProperty && !$this->wire('config')->ajax) $ajaxSaveProperty = '';
+
+		if($formDelete && $formDelete == $form->id && $this->forms->hasPermission('form-delete', $form)) {
+			$this->forms->delete($form); 
+			$this->message(sprintf($this->_('Deleted form: %s'), $form->name)); 
+			$this->session->redirect("../"); 
+			return '';
+		} else if($ajaxSaveProperty === 'form_fields') {
+			$this->executeSaveFormFields($form, null, $redirectUrl);
+			$success = $this->forms->save($form); 
+			$result = array('success' => $success, 'message' => $success ? 'OK' : 'Fail');
+			echo json_encode($result);
+			exit;
+		}
+
+		$editForm = $this->buildEditForm($id);
+		$editForm->processInput($input->post); 
+
+		$this->executeSaveFormSettings($form, $editForm);
+		if(!$formInclude) $this->executeSaveFormOutput($form, $editForm);
+		if(!$formInclude) $this->executeSaveFormActions($form, $editForm);
+		if($this->forms->useRoles && !$formInclude && ($this->wire('user')->isSuperuser() || $this->wire('user')->hasPermission('form-builder-admin'))) {
+			$this->executeSaveFormAccess($form, $editForm);
+		}
+		$this->executeSaveFormFields($form, $editForm, $redirectUrl);
+
+		$this->forms->save($form); 
+		$this->message($this->labels('saved-form')); 
+		if($input->post('_maintNow')) {
+			$this->forms->maintenance($form);
+			$this->warning($this->_('Completed forms maintenance')); 
+		}
+		if($input->post('submit_import') && $input->post('_import_json')) {
+			return $this->executeImport();
+		} else {
+			$this->session->redirect($redirectUrl);
+		}
+		return '';
+	}
+
+	/**
+	 * Save form settings tab
+	 * 
+	 * @param FormBuilderForm $form
+	 * @param InputfieldForm $editForm
+	 * 
+	 */
+	protected function ___executeSaveFormSettings($form, $editForm) {
+		
+		if($form->hasPermission('form-delete')) {
+			$formName = $editForm->get('form_name')->attr('value');
+			$formName = str_replace('.', '_', $this->wire('sanitizer')->pageName($formName)); 
+			$form->name = $formName; 
+			if($this->forms->isReservedName($form->name)) $form->name .= '_';
+		}
+		
+		$intProperties = array(
+			'allowPreset',
+			'skipSessionKey',
+			'useCookies',
+			'hLevel',
+			'showNav',
+			'partialEntryType',
+			'partialEntryDays',
+		);
+			
+		foreach($intProperties as $key) {
+			$f = $editForm->getChildByName("form_$key");
+			if($f) $form->$key = (int) $f->attr('value');
+		}
+		
+		$flagProperties = array(
+			'flagNoModal' => FormBuilderProcessor::formFlagNoModal,
+			'flagInclude' => FormBuilderProcessor::formFlagInclude,
+			'flagDisabled' => FormBuilderProcessor::formFlagDisabled,
+		);
+
+		foreach($flagProperties as $name => $flag) {
+			$f = $editForm->getChildByName("form_$name");
+			if(!$f) continue;
+			if((int) $f->attr('value')) {
+				$form->addFlag($flag); 
+			} else {
+				$form->removeFlag($flag);
+			}
+		}
+	}
+
+	/**
+	 * Save form output tab
+	 *
+	 * @param FormBuilderForm $form
+	 * @param InputfieldForm $editForm
+	 *
+	 */
+	protected function executeSaveFormOutput($form, $editForm) {
+		
+		/** @var Languages $languages */
+		$languages = $this->wire('languages'); 
+		
+		/** @var Sanitizer $sanitizer */
+		$sanitizer = $this->wire('sanitizer');
+	
+		// field name => sanitizer method
+		$names = array(
+			'submitText' => 'text', 
+			'nextText' => 'text',  // only present if numPagination>1
+			'backText' => 'text', // only present if numPaginations>1
+			'successMessage' => 'textarea', 
+			'errorMessage' => 'textarea',
+		);
+		
+		foreach($names as $name => $method) {
+			
+			$field = $editForm->getChildByName("form_$name");
+			if(!$field) continue;
+			
+			$value = $field->attr('value');
+			$value = $sanitizer->$method($value, array('stripTags' => strpos($value, 'html:') !== 0)); 
+			$form->$name = $value; 
+			
+			if(!$languages) continue; 
+			
+			foreach($languages as $language) {
+				if($language->isDefault()) continue; 
+				$value = $field->get("value$language");
+				$value = $sanitizer->$method($value, array('stripTags' => strpos($value, 'html:') !== 0)); 
+				$form->set("$name$language", $value); 
+			}
+		}
+		
+		foreach(array('framework', 'theme', 'mobilePx') as $name) {
+			$field = $editForm->get("form_$name");
+			$value = $sanitizer->text($field->attr('value'));
+			if($name == 'mobilePx') {
+				if(preg_match('/^\d+\s*[a-z]+$/i', trim($value))) {
+					if(strpos($value, ' ')) $value = str_replace(' ', '', $value); 
+					// quantity with type (px, em, etc.)
+				} else {
+					$value = (int) $value;
+				}
+			}
+			$form->$name = $value;
+		}
+
+		/** @var FormBuilderFramework $framework */
+		$framework = $this->forms->getFramework($form);
+		if($framework) {
+			// configuration specific to framework
+			$prefix = $framework->getPrefix();
+			$inputfields = $framework->getConfigInputfields();
+			foreach($inputfields->getAll() as $f) {
+				$name = $prefix . $f->name; 
+				$f = $editForm->getChildByName($name);
+				if($f) $form->set($name, $f->value);
+			}
+		}
+	}
+
+	/**
+	 * Save form fields tab
+	 *
+	 * @param FormBuilderForm $form
+	 * @param InputfieldForm $editForm
+	 * @param string $redirectUrl
+	 *
+	 */
+	protected function executeSaveFormFields($form, $editForm, &$redirectUrl) {
+		// prepare to process the form fields	
+		$formFlat = $form->getChildrenFlat();
+		$parents = array($form);
+		$parent = $form;
+		$formFields = $this->input->post('form_fields');
+		$renamedFields = $this->wire()->session->getFor($this, "renamedFields$form->id");
+		
+		if(!is_array($formFields)) $formFields = array();
+		if(!is_array($renamedFields)) $renamedFields = array();
+
+		// check for deleted fields
+		foreach($formFlat as $child) { 
+			if(in_array($child->name, $formFields)) continue; 
+			if(in_array($child->name, $renamedFields)) continue;
+			if($child->parent) $child->parent->remove($child);	
+			$this->message(sprintf($this->_('Removed field: %s'), $child->name)); 
+		}
+
+		foreach($formFields as $name) {
+			
+			$name = $this->wire('sanitizer')->fieldName($name);
+			if(empty($name)) continue;
+
+			if(substr($name, -4) == '_END') {
+				$parent = array_pop($parents);
+				continue; 
+			}
+
+			$field = $form->find($name);
+			if(!$field && isset($renamedFields[$name])) $field = $form->find($renamedFields[$name]);
+			if(!$field) continue; 
+
+			if($parent) {
+				$parent->add($field); 
+			} else {
+				$form->add($field); 
+			}
+
+			if($field->type == 'Fieldset') {
+				if($parent) $parents[] = $parent; 
+				$parent = $field; 
+			}
+		}
+
+		if($this->input->post('field_label') && $editForm) {
+			// new field added
+			$fieldType = $editForm->get('field_type')->attr('value'); 
+			$field = null;
+
+			if(strpos($fieldType, '_duplicate_') === 0) {
+				list(,$cloneName) = explode('_duplicate_', $fieldType);
+				// duplicating an existing field
+				foreach($formFlat as $f) {
+					if($f->name == $cloneName) $field = clone $f;
+				}
+				/*
+			} else if(strpos($fieldType, '_form:') === 0) {
+				// adding form as field
+				list(,$fieldFormID, $fieldFormName) = explode(':', $fieldType);
+				$field = new FormBuilderField();
+				$field->type = "Form:$fieldFormID:$fieldFormName";
+				*/
+
+			} else {
+				// creating a new field
+				$field = new FormBuilderField();
+				$field->setWire($this->wire());
+				$field->type = $fieldType;
+			}
+
+			$fieldName = strtolower(trim(
+				$this->sanitizer->pageName($editForm->get('field_label')->attr('value'), Sanitizer::translate), 
+				'_-'
+			)); 
+			$fieldName = str_replace(array('-', '.'), '_', $fieldName);
+			$field->name = $fieldName; 
+			$n = 0; 
+			while(in_array($field->name, $formFields) || $this->forms->isReservedName($field->name)) {
+				$field->name = $fieldName . "_" . (++$n); // ensure uniqueness
+			}
+			$field->label = $editForm->get('field_label')->attr('value'); 
+			$form->add($field); 
+			$this->message($this->_('Added field') . ' - ' . $field->name); 
+			$redirectUrl = "../editField/?id={$form->id}&name={$field->name}&first_edit=1";
+		}
+	}
+
+	/**
+	 * Save form actions tab
+	 *
+	 * @param FormBuilderForm $form
+	 * @param InputfieldForm $editForm
+	 *
+	 */
+	protected function executeSaveFormActions($form, $editForm) {
+		
+		$languages = $this->wire('languages'); 
+		
+		$form->honeypot = $editForm->get('form_honeypot')->attr('value');
+		$form->listFields = $editForm->get('form_listFields')->attr('value'); 
+		$form->entryDays = $editForm->get('form_entryDays')->attr('value');
+		
+		// email and responders
+		$form->emailTo = $editForm->get('form_emailTo')->attr('value');
+		$form->emailFrom = $editForm->get('form_emailFrom')->attr('value');
+		$form->emailFrom2 = $editForm->get('form_emailFrom2')->attr('value');
+		$form->emailSubject = $editForm->get('form_emailSubject')->attr('value');
+		$form->emailFiles = (int) $editForm->get('form_emailFiles')->attr('value');
+		$form->responderFrom = $editForm->get('form_responderFrom')->attr('value');
+		$form->responderFromName = $editForm->get('form_responderFromName')->attr('value');
+		$form->responderReplyTo = $editForm->get('form_responderReplyTo')->attr('value');
+		
+		$responderTo = $editForm->get('form_responderTo')->attr('value');
+		if(is_array($responderTo)) $responderTo = trim(implode(',', $responderTo), ', '); 
+		$form->responderTo = $responderTo;
+
+		// multi-language responder fields: subject and body
+		foreach(array('responderSubject', 'responderBody') as $name) {
+			$field = $editForm->get("form_$name"); 
+			$form->$name = $field->attr('value'); 
+			if($languages) foreach($languages as $language) {
+				if($language->isDefault()) continue; 
+				$form->set($name . $language->id, $field->get("value$language->id")); 
+			}
+		}
+
+		// saveFlags and pluginActions
+		$saveFlags = 0;
+		$pluginActions = array();
+		foreach($editForm->get('form_saveFlags')->attr('value') as $flag) {
+			if(ctype_digit("$flag")) {
+				// Action flag
+				$flag = (int) $flag;
+				$saveFlags = $saveFlags | $flag;
+			} else {
+				// Action module
+				$name = $this->wire()->sanitizer->fieldName($flag); // i.e. "FormBuilderProcessorStripeCheckout"
+				if(!strlen($name)) continue;
+				if(!$this->wire()->modules->isInstalled($name)) continue;
+				$pluginActions[] = $name;
+			}
+		}
+		$form->saveFlags = $saveFlags; 
+		$form->pluginActions = $pluginActions;
+
+		// save settings for any FormBuilderProcessorAction modules
+		foreach($pluginActions as $moduleName) {
+			$values = $form->get($moduleName);
+			if(!is_array($values)) $values = array();
+			/** @var InputfieldFieldset $fieldset */
+			$fieldset = $editForm->getChildByName('fieldset' . $moduleName); 
+			if(!$fieldset) continue;
+			foreach($fieldset->getAll() as $f) {
+				if($f instanceof InputfieldWrapper || $f instanceof InputfieldMarkup) continue;
+				$name = str_replace($moduleName . '_', '', $f->attr('name'));
+				if(strpos($name, '_') === 0) continue; // skip any that begin with underscore
+				$values[$name] = $f->attr('value'); 
+			}
+			$form->set($moduleName, $values);
+		}
+
+		// alternate submit methods
+		if($saveFlags & FormBuilderProcessor::saveFlagExternal) {
+			$form->method = $editForm->get('form_method')->attr('value');
+			$form->action = $editForm->get('form_action')->attr('value');
+			$form->target = $editForm->get('form_target')->attr('value');
+		} else {
+			$form->method = null;
+			$form->action = null;
+			$form->target = null;
+		}
+
+		$form->action2 = $editForm->get('form_action2')->attr('value');
+		
+		// duplicate submission settings, convert to array 
+		foreach(array('action2_remove', 'action2_add', 'action2_rename', 'turingTest') as $fieldName) {
+			$field = $editForm->get("form_$fieldName");
+			if(!$field) continue; 
+			$value = explode("\n", $field->attr('value'));
+			$newValue = array();
+			foreach($value as $k => $v) {
+				if(!strlen($v)) continue; 
+				$pos = strpos($v, '=');
+				if($pos) {
+					// field=value
+					$key = trim(substr($v, 0, $pos)); 	
+					$newValue[$key] = trim(substr($v, $pos+1));
+				} else {
+					// just a field name
+					$newValue[] = trim($v);
+				}
+			}
+			if(is_null($form->$fieldName) && empty($newValue)) continue; 
+			$form->$fieldName = $newValue; 
+		}
+
+		// convert 3 fields to 1 CSV for Akismet property
+		$akismet = 
+			$this->sanitizer->fieldName($this->input->post('akismetName')) . ',' . 
+			$this->sanitizer->fieldName($this->input->post('akismetEmail')) . ',' . 
+			$this->sanitizer->fieldName($this->input->post('akismetMessage'));
+		
+		if($akismet == ',,') {
+			$form->remove('akismet');
+		} else {
+			$form->akismet = $akismet;
+		}
+	
+		// Google sheets settings
+		if($form->saveFlags & FormBuilderProcessor::saveFlagGoogleSheets) {
+			$this->googleSpreadsheetProcess($form);
+		}
+		
+		// save to ProcessWire page settings
+		if($form->saveFlags & FormBuilderProcessor::saveFlagPage) { 
+			$form->savePageParent = (int) $this->wire('input')->post('form_savePageParent');
+			$form->savePageTemplate = (int) $this->wire('input')->post('form_savePageTemplate');
+			$form->savePageStatus = (int) $this->wire('input')->post('form_savePageStatus');
+			$savePageFields = array();
+			if($form->savePageTemplate) { 
+				$savePageTemplate = $this->wire('templates')->get($form->savePageTemplate);
+				if($savePageTemplate) {
+					// native
+					foreach(array('name') as $name) {
+						$value = $this->wire('sanitizer')->fieldName($this->wire('input')->post('savePageFields_' . $name)); 
+						if($value) $savePageFields[$name] = $value; 	
+					}
+					// custom
+					foreach($savePageTemplate->fieldgroup as $f) {
+						$value = $this->wire('sanitizer')->fieldName($this->wire('input')->post('savePageFields_' . $f->id)); 
+						if($value) $savePageFields[$f->id] = $value; 
+					}
+				}
+			}
+			$form->savePageFields = $savePageFields;
+		}
+	}
+	
+	protected function googleSpreadsheetProcess(FormBuilderForm $form) {
+		
+		if(!$this->wire('modules')->isInstalled('GoogleClientAPI')) {
+			$this->error('Google spreadsheet functions are not available because the GoogleClientAPI module is not installed.');
+			return;
+		}
+		
+		$spreadsheetUrl = $this->input->post->url('form_googleSpreadsheetUrl');
+		if(strlen($spreadsheetUrl) && strpos($spreadsheetUrl, '://') === false) {
+			// add new spreadsheet
+			$title = $this->wire('sanitizer')->text($spreadsheetUrl);
+			if(strlen($title)) {
+				try {
+					/** @var GoogleClientAPI $google */
+					$google = $this->wire('modules')->get('GoogleClientAPI');
+					$spreadsheet = $google->sheets()->addSpreadsheet($title);
+					$spreadsheetUrl = $spreadsheet->spreadsheetUrl;
+					if($spreadsheetUrl) {
+						$entUrl = $this->wire('sanitizer')->entities($spreadsheetUrl);
+						$this->message(
+							$this->_('Added new Google Sheets spreadsheet:') . '<br />' . 
+							"<a target='_blank' href='$entUrl'>$entUrl</a>", 
+							Notice::allowMarkup
+						);
+					}
+				} catch(\Exception $e) {
+					$this->error("Error creating new spreadsheet: " . $e->getMessage()); 
+				}
+			}
+		}
+		$form->googleSpreadsheetUrl = $this->wire('sanitizer')->url($spreadsheetUrl);
+		
+		$spreadsheetFields = $this->input->post->array('form_googleSpreadsheetFields');
+		
+		foreach($spreadsheetFields as $k => $v) {
+			$v = $this->wire('sanitizer')->fieldName($v);
+			$spreadsheetFields[$k] = $v;
+			if(empty($v)) unset($spreadsheetFields[$k]);
+		}
+		
+		$form->googleSpreadsheetFields = $spreadsheetFields;
+		$form->googleSheetsResponseField = $this->input->post->fieldName('form_googleSheetsResponseField');
+		
+		if($this->input->post('_googleSpreadsheetTest')) {
+			$this->googleSpreadsheetTest($form);
+		}
+	}
+	
+	/**
+	 * Test Google sheets function
+	 * 
+	 * @param FormBuilderForm $form
+	 * 
+	 */
+	protected function googleSpreadsheetTest($form) {
+		/** @var GoogleClientAPI $google */
+		$google = $this->wire('modules')->get('GoogleClientAPI');
+		if(!$google) {
+			$this->warning('GoogleClientAPI module not installed');
+			return;
+		}
+		if(!$form->googleSpreadsheetUrl) {
+			$this->warning("Google spreadsheet URL not specified"); 
+			return;
+		}
+	
+		try {
+			/** @var GoogleSheets $sheets */
+			$sheets = $google->sheets();
+			$sheets->setSpreadsheetUrl($form->googleSpreadsheetUrl);
+		} catch(\Exception $e) {
+			$this->error($e->getMessage());
+		}
+		
+		try {
+			$row = array_values($form->googleSpreadsheetFields);
+			$blank = 0;
+			foreach($row as $k => $v) {
+				if(strpos($v, '_blank') === 0) {
+					$row[$k] = sprintf($this->_('Blank %d'), (++$blank));
+				} else if(isset($this->fieldLabels[$v])) {
+					$row[$k] = $this->fieldLabels[$v];
+				}
+			}
+			$result = $sheets->appendRow($row);
+			if($result) {
+				$this->message("Successfully appended a row to the spreadsheet"); 
+			}
+		} catch(\Exception $e) {
+			$this->error($e->getMessage());
+		}
+
+	}
+
+	/**
+	 * Save form access tab
+	 *
+	 * @param FormBuilderForm $form
+	 * @param InputfieldForm $editForm
+	 *
+	 */
+	protected function executeSaveFormAccess($form, $editForm) {
+		$roles = array();
+		foreach($form->roles as $permission => $unused) {
+			$f = $editForm->get("roles_" . str_replace('-', '_', $permission)); 
+			$value = $f ? $f->attr('value') : array();
+			foreach($value as $k => $v) $value[$k] = $this->wire('sanitizer')->pageName($v);
+			$roles[$permission] = $value; 
+		}
+		$form->set('roles', $roles);
+	}
+
+	/**
+	 * Build the form used by the 'edit field' action
+	 *
+	 * This is also used by the 'add field' action in editForm, though it uses a truncated version.
+	 *
+	 * @param FormBuilderField $editField Field being edited (optional)
+	 * @param array $cloneOptions
+	 * @param int $formID
+	 * @return InputfieldWrapper
+	 *
+	 */
+	protected function ___buildEditField($editField = null, $cloneOptions = null, $formID = 0) {
+	
+		/** @var Modules $modules */
+		$modules = $this->wire('modules');
+
+		/** @var Languages $languages */
+		$languages = $this->wire('languages'); 
+		
+		$languageFields = array();
+		
+		/** @var InputfieldFieldset|null $nameTypeFieldset */
+		$nameTypeFieldset = null;	
+		
+		/** @var InputfieldWrapper $form */
+
+		if($editField) {
+			// existing field being edited
+			$form = $modules->get("InputfieldForm"); 
+			$form->addClass('InputfieldFormConfirm');
+			$form->attr('action', "../editField/?id=$formID&name={$editField->name}");
+			$form->attr('method', 'post');
+			$form->attr('id', 'ProcessFormBuilder');
+			//$form->description = $editField->label;
+
+			$tab = new InputfieldWrapper();
+			$tab->attr('title', $this->_x('Basics', 'tab'));
+			$tab->class = 'WireTab';
+			$form->add($tab);
+			
+			if(!$this->wire('input')->get('first_edit')) {
+				// editing an existing field
+				$nameTypeFieldset = $modules->get('InputfieldFieldset');
+				$nameTypeFieldset->label = $this->_('Name and Type'); 
+				$nameTypeFieldset->description = $this->_('Avoid changes to these, especially after form submission entries exist.');
+				$nameTypeFieldset->collapsed = Inputfield::collapsedYes;
+				$nameTypeFieldset->icon = 'gears';
+			}
+
+		} else {
+			// add field form
+			$form = $modules->get("InputfieldFieldset"); 
+			$form->label = $this->_('Add New Field');
+			$form->icon = 'plus-circle';
+			$tab = $form;
+		}
+		
+		$basicsTab = $tab;
+
+		/** @var InputfieldSelect $field */
+		$field = $modules->get('InputfieldSelect'); 
+		$field->attr('name', 'field_type'); 
+		$field->label = $this->_x('Type', 'edit-field-label'); 
+		$field->description = $this->_('The input type used to collect data for this field.');
+		$field->icon = 'puzzle-piece';
+
+		$configData = $modules->getModuleConfigData('FormBuilder');
+		$inputfieldClasses = $configData['inputfieldClasses'];
+		foreach($this->inputfieldExtraClasses as $class) {
+			if($modules->isInstalled("Inputfield$class")) $inputfieldClasses[] = $class;
+		}
+		sort($inputfieldClasses); 
+		
+		foreach($inputfieldClasses as $class) {
+			$info = $modules->getModuleInfo('Inputfield' . $class); 
+			if(!$info) continue; 
+			$label = $info['title'];
+			$field->addOption($class, $label); 
+		}
+
+		if($editField) {
+			$field->attr('value', $editField->type); 
+			$field->columnWidth = 50;
+			$field->notes = $this->_('Changing the type may cause problems with existing form data.');
+			$field->required = true; 
+		} else {
+			$field->attr('value', 'Text'); 
+			$field->columnWidth = 33; 
+			if($cloneOptions) {
+				$options = array();
+				foreach($cloneOptions as $f) {
+					if($f->type && $f->type != 'Fieldset') {
+						$options["_duplicate_{$f->name}"] = $f->name;
+					}
+				}
+				asort($options); 
+				$field->addOption($this->_('Duplicate Existing Field'), $options); 
+			}
+			/*
+			$options = array();
+			foreach($this->forms->getFormNames() as $id => $name) {
+				if($id !== $formID) $options["_form:$id:$name"] = $name;
+			}
+			asort($options);
+			$field->addOption($this->_('Add Form As Field'), $options);
+			*/
+		}
+		$nameTypeFieldset ? $nameTypeFieldset->add($field) : $tab->add($field); 
+
+		if($editField) {
+			// existing field being edited
+			$field = $modules->get('InputfieldText'); 
+			$field->label = $this->_('Name'); 
+			$field->description = $this->_('The name FormBuilder uses to reference and store data for this field.');
+			$field->attr('id+name', 'field_name'); 
+			$field->required = true; 
+			$field->attr('value', $editField->name);
+			$field->columnWidth = 50; 
+			$field->icon = 'lightbulb-o';
+			$field->notes = $this->_('Must have only `a-z`, `0-9` or `_` (underscore).');
+			$nameTypeFieldset ? $nameTypeFieldset->prepend($field) : $tab->prepend($field); 	
+		}
+
+		$field = $modules->get('InputfieldPageTitle'); 
+		$field->attr('name', 'field_label'); 
+		$field->label = $this->_x('Label', 'edit-field-label');
+		$field->description = $this->_('The primary label text that the user sees for this field. Appears above the field input.');
+		$field->icon = 'thumb-tack';
+		if($editField) {
+			$field->attr('value', $editField->label);
+			$field->required = true; 
+		} else {
+			$field->columnWidth = 66; 
+		}
+		$languageFields[$field->name] = $field;
+		$tab->add($field); 
+
+		if($editField) {
+			// existing field being edited
+			$field = $modules->get('InputfieldTextarea'); 
+			$field->attr('name', 'description');
+			$field->attr('value', $editField->description);
+			$field->label = $this->_('Description');
+			$field->description = $this->_('Additional description text to appear with the field. For instance, the text you are reading now is description text.'); 
+			$field->collapsed = Inputfield::collapsedBlank;
+			$field->icon = 'align-left';
+			$languageFields[$field->name] = $field;
+			$tab->add($field);
+
+			$field = $modules->get('InputfieldTextarea'); 
+			$field->attr('name', 'notes');
+			$field->attr('value', $editField->notes);
+			$field->label = $this->_('Notes');
+			$field->description = $this->_('Additional text that appears below the input field.'); 
+			$field->notes = $this->_('You are reading "notes" right now (this is where it appears).'); 
+			$field->collapsed = Inputfield::collapsedBlank;
+			$field->icon = 'paperclip';
+			$languageFields[$field->name] = $field;
+			$tab->add($field);
+		
+			/** @var Inputfield $inputfield */
+			$inputfield = $modules->get("Inputfield" . $editField->type);
+			
+			if($inputfield) {
+				$tab = new InputfieldWrapper();
+				$tab->attr('title', $this->_x('Details', 'tab'));
+				$tab->class = 'WireTab';
+				$form->add($tab);
+				// notify the inputfield that it's operating in an independent mode, without a Fieldtype
+				// this alters what gets returned from getConfigInputfields on some inputfields, like Select
+				// which provides an options textarea input
+				$inputfield->hasFieldtype = false;
+
+				// we place some additional limits on 'Page' inputfields
+				if($editField->type == 'Page') {
+					$inputfield->set('inputfieldClasses', $this->getInputfieldPageClasses());
+				}
+				
+				$setKeys = array();
+
+				// set before calling getConfigInputfields()
+				foreach($editField->getArray() as $k => $v) {
+					if($k !== 'type') $inputfield->set($k, $v);
+				}
+				
+				// set all values to $inputfield before adding them to our form
+				$inputfields = $inputfield->getConfigInputfields();
+				if($inputfields) {
+					foreach($inputfields->getAll() as $i) {
+						$name = $i->attr('name');
+						$value = $editField->get($name);
+						if(!is_null($value)) {
+							$inputfield->set($name, $value);
+						}
+						$setKeys[$name] = $name;
+					}
+				}
+			
+				// now get a fresh $inputfields with the values already set
+				// and set values for individual inputfields
+				$inputfields = $inputfield->getConfigInputfields();
+				if($inputfields) {
+					foreach($inputfields->getAll() as $i) {
+						$name = $i->attr('name');
+						$value = $editField->get($name);
+						$i->attr('value', $value);
+						if($i->useLanguages) $languageFields[$i->name] = $i;
+					}
+
+					// now that values are set, add them to our form
+					foreach($inputfields as $i) {
+						$name = $i->attr('name');
+						$tab->add($i);
+						$setKeys[$name] = $name;
+					}
+					
+					// some things can be missed on the first round, so this provides a backup (like for Page fields)
+					$a = $editField->getArray();
+					unset($a['type'], $a['label'], $a['description'], $a['notes']);
+					foreach($a as $name => $value) {
+						if(isset($setKeys[$name])) continue;
+						$i = $inputfields->getChildByName($name);
+						if($i) $i->attr('value', $value);
+					}
+				}
+			
+				// move some items from details tab to basics tab
+				$moveItems = array('columnWidth', 'visibility', 'required', 'requiredAttr', 'requiredIf');
+				foreach($moveItems as $name) {
+					$f = $tab->getChildByName($name);
+					if(!$f) continue;
+					$f->getParent()->remove($f);
+					if($name == 'visibility' || $name == 'requiredIf') {
+						$f->description .= ' ' . $this->_('Applicable when supported by output framework and embed method. Always test for compatibility.');
+					} else if($name == 'columnWidth') {
+						$f->description .= ' ' . $this->_('This setting is not used on "horizontal" forms.'); 
+					}
+					$basicsTab->append($f);
+				}
+			
+				if($tab->children()->count() && $this->wire('input')->get('first_edit')) {
+					$form->appendMarkup = "<p class='detail' style='clear:both;'>" .
+						$this->_('See the "Details" tab for additional field configuration.') . "</p>";
+				}
+				
+			} else if($inputfield === null) {
+				$this->error(sprintf($this->_('Unknown inputfield type: %s'), $editField->type)); 
+			}
+
+			/** @var InputfieldRadios $f */
+			/*
+			$f = $this->wire('modules')->get('InputfieldRadios');
+			$f->attr('name', 'pageBreak');
+			$f->label = $this->_('Pagination/page break');
+			$f->addOption(0, 'None');
+			$f->addOption(-1, 'Before this field');
+			$f->addOption(1, 'After this field');
+			$f->optionColumns = 1;
+			if(!$editField->get('pageBreak')) $f->collapsed = Inputfield::collapsedYes;
+			$f->attr('value', (int) $editField->get('pageBreak'));
+			$basicsTab->add($f);
+			*/
+			
+			if($nameTypeFieldset) $basicsTab->add($nameTypeFieldset);
+
+			/** @var InputfieldHidden $field */
+			$field = $modules->get('InputfieldHidden');
+			$field->attr('id+name', '_form_id');
+			$field->attr('value', (int) $this->input->get('id')); 
+			$form->add($field); 
+
+			// keep track of the current name in _field_name, in case they change it
+			$field = $modules->get('InputfieldHidden');
+			$field->attr('id+name', '_field_name'); 
+			$field->attr('value', $editField->name); 
+			$form->add($field); 
+
+			/** @var InputfieldSubmit $submit */
+			$submit = $modules->get('InputfieldSubmit');
+			$submit->attr('value', $this->labels('save'));
+			$submit->attr('name', '_submit_save_field'); 
+			$submit->showInHeader(true);
+			if(!$this->wire()->input->get('modal')) {
+				$submit->addActionValue('exit', $this->_('Save + Exit'), 'times');
+			}
+			$form->add($submit);
+			
+			$placeholder = $form->getChildByName('placeholder');
+			if($placeholder && $placeholder->useLanguages) {
+				$languageFields[$placeholder->name] = $placeholder;
+			}
+
+			if($languages) foreach($languageFields as $field) {
+				$field->useLanguages = true;
+				$name = $field->name;
+				if($name == 'field_label') $name = 'label';
+				foreach($languages as $language) {
+					if($language->isDefault) continue;
+					$field->set("value{$language->id}", $editField->get("$name{$language->id}"));
+				}
+			}
+		}
+
+		return $form; 
+	}
+
+	/**
+	 * Get class names used for Page fields
+	 * 
+	 * @return array
+	 * 
+	 */
+	public function ___getInputfieldPageClasses() {
+		return $this->inputfieldPageClasses;
+	}
+
+	/**
+	 * Execute the 'edit field' action
+	 *
+	 * @return string
+	 * @throws WirePermissionException|WireException
+	 *
+	 */
+	public function ___executeEditField() {
+		
+		/** @var WireInput $input */
+		$input = $this->wire('input');
+		/** @var Sanitizer $sanitizer */
+		$sanitizer = $this->wire('sanitizer');
+		/** @var Session $session */
+		$session = $this->wire('session');
+		/** @var Modules $modules */
+		$modules = $this->wire('modules');
+		/** @var Languages $languages */
+		$languages = $this->wire('languages');
+		/** @var Config $config */
+		$config = $this->wire('config');
+
+		$modal = (int) $input->get('modal');
+		$formID = (int) $input->get('id'); 
+		$form = $this->getForm($formID, 'form-edit');
+		
+		$name = $sanitizer->name($input->get('name'));
+		if(!$name) throw new WireException("No field specified"); 
+		
+		$editField = $form->find($name);
+		if(!$editField) {
+			$renamedFields = $this->wire()->session->getFor($this, "renamedFields$formID");
+			if(is_array($renamedFields) && isset($renamedFields[$name])) {
+				$newName = $renamedFields[$name];
+				$editField = $form->find($newName);
+				if($editField) $name = $newName;
+			}
+			if(!$editField) throw new WireException("Unknown field: $name");
+		}
+		/*
+		$columnWidth = $input->get('columnWidth');
+		if($columnWidth !== null) {
+			$editField->columnWidth = (int) $columnWidth; 
+		}
+		*/
+		
+		if(($input->get('save_property') || $input->post('save_property')) && $config->ajax) {
+			// ajax request to update just specific property of a field
+			$this->editFieldSaveProperty($form, $editField);
+		}
+
+		$editFieldForm = $this->buildEditField($editField, null, $formID);
+		$editFormURL = "../editForm/?id=$formID"; 
+		$editFieldURL = "../editField/?id=$formID&name=$name";	
+		
+		if(method_exists($modules, 'getModule')) {
+			$modules->getModule('ProcessField', array('noPermissionCheck' => true)); 
+		} else {
+			$modules->get('ProcessField'); 
+		}
+	
+		$title = sprintf($this->_('Edit Field: %s'), $editField->label);
+		$this->browserTitle($title);
+		$this->headline($modal ? $editField->label : $title); 
+		
+		if($input->post('_submit_save_field')) {
+
+			if($formID != $input->post('_form_id') || $name != $input->post('_field_name')) {
+				throw new WireException("Form/field mismatch: GET and POST data does not match");
+			}
+			
+			$editFieldForm->processInput($input->post);
+			$submitAction = $input->post('_action_value');
+			if(count($editFieldForm->getErrors()) || $modal || $submitAction != 'exit') {
+				// keep editing field
+				$redirectURL = $editFieldURL;
+			} else {
+				// redirect back to editing form
+				$redirectURL = $editFormURL;
+			}
+			
+			foreach($editFieldForm->getAll() as $f) {	
+				
+				$key = $f->attr('name');
+				if($key[0] == '_') continue; // skip over internal use fields	
+				$value = $f->attr('value'); 
+				
+				if(in_array($key, array('field_name', 'field_type', 'field_label'))) {
+					$key = str_replace('field_', '', $key);
+				}
+				
+				if($key == 'type' && $editField->type != $value) {
+					$this->message($this->_('Input type changed - please check for new configuration options and hit save again.')); 
+					$redirectURL = $editFieldURL;
+				}
+				
+				if($key == 'name') { 
+					$value = $sanitizer->fieldName($value); 
+					if($this->forms->isReservedName($value)) {
+						$this->error(sprintf($this->_('The name "%s" is a reserved name.'), $value)); 
+						$value .= '_'; 
+					} else if($input->post('_field_name') && $input->post('_field_name') != $value) {
+						// name has changed, make sure it's not already in use
+						$test = $form->find($value);
+						if($test) {
+							$this->error(sprintf($this->_('The field name "%s" is already in use by another field.'), $value));
+							$value = $sanitizer->fieldName($input->post('_field_name')); 
+						} else {
+							// ensure next request points to updated field name
+							$sessionKey = "renamedFields$formID";
+							$renamedFields = $this->wire()->session->getFor($this, $sessionKey);
+							if(!is_array($renamedFields)) $renamedFields = array();
+							$renamedFields[$name] = $value; 
+							$this->wire()->session->setFor($this, $sessionKey, $renamedFields);
+							$redirectURL = str_replace("name=$name", "name=$value", $redirectURL);
+						}
+					}
+				} 
+				
+				$editField->set($key, $value);
+				
+				if($languages && $f->useLanguages) {
+					foreach($languages as $language) {
+						if($language->isDefault()) continue; 
+						$editField->set($key . $language->id, $f->get("value$language->id")); 
+					}
+				}
+			}
+
+			$form->save();
+			$session->redirect($redirectURL); 
+
+		} else {
+			// $this->wire('breadcrumbs')->add(new Breadcrumb($editFormURL, ucfirst($form->name))); 
+			$this->breadcrumb($editFormURL, ucfirst($form->name));
+			return $editFieldForm->render();
+		}
+		
+		return '';
+	}
+
+	/**
+	 * Ajax property save for fields as called by executeEditField
+	 * 
+	 * @param FormBuilderForm $form
+	 * @param FormBuilderField $field
+	 * 
+	 */
+	protected function editFieldSaveProperty(FormBuilderForm $form, FormBuilderField $field) {
+		
+		/** @var WireInput $input */
+		$input = $this->wire('input');
+		/** @var Sanitizer $sanitizer */
+		$sanitizer = $this->wire('sanitizer');
+		
+		// ajax request to update just specific property of a field
+		$property = $sanitizer->fieldName($input->post('save_property'));
+		$value = $input->post($property);
+		$newValue = null;
+		$success = true;
+		
+		if($property === 'columnWidth') {
+			$oldValue = (int) $field->$property;
+			$value = (int) $value;
+			if($value < 10) $value = 10;
+			if($value > 100) $value = 100;
+			if($value != $oldValue) {
+				$field->columnWidth = $value;
+				$message = "Updated column width from $oldValue to $value";
+				$newValue = $field->columnWidth;
+			} else {
+				$success = false;
+				$message = "No change";
+			}
+			
+		} else if($property === 'required') {
+			$oldValue = (int) $field->required;
+			$value = (int) $value;
+			if($value != $oldValue) {
+				$field->required = $value ? true : false;
+				$message = "Updated required state to $value";
+				if($field->required) {
+					$newValue = $field->requiredIf ? '**' : '*';
+				} else {
+					$newValue = '';
+				}
+			} else {
+				$success = false;
+				$message = "No change";
+			}
+		} else {
+			$success = false;
+			$message = 'Unknown property';
+		}
+		
+		if($success) {
+			if(!$form->save()) {
+				$success = false;
+				$message = 'Failed to save form';
+			}
+		}
+		
+		$response = array(
+			'success' => $success, 
+			'message' => $message, 
+			'value' => $newValue
+		);
+		
+		echo json_encode($response);
+		exit;
+	}
+
+	/**
+	 * Execute the 'preview' action
+	 *
+	 * @return string
+	 * @throws WirePermissionException
+	 *
+	 */
+	public function ___executeView() {
+		$id = (int) $this->input->get('id'); 
+		if(!$id) return $this->error('Nothing to preview');
+		$form = $this->getForm($id, 'form-submit');
+		$form->action = "./view/?id=$id&modal=1";
+		return $form->render();
+	}
+
+	/**
+	 * Execute the 'list entries' action
+	 *
+	 * @return string
+	 *
+	 */
+	public function ___executeListEntries() {
+		return $this->processEntries()->executeListEntries();
+	}
+
+	/**
+	 * Execute the 'view entry' action, optionally in edit mode
+	 *
+	 * @param bool $edit Whether or not we're in edit mode
+	 * @return string
+	 *
+	 */
+	public function ___executeViewEntry($edit = false) {
+		return $this->processEntries()->executeViewEntry($edit);
+	}
+
+	/**
+	 * Execute the 'edit entry' action, which is the same as 'view entry' in edit mode
+	 *
+	 * @return string
+	 *
+	 */
+	public function ___executeEditEntry() {
+		return $this->executeViewEntry(true);
+	}
+
+	/**
+	 * Install the module and create the page where it lives
+	 *
+	 */
+	public function ___install() {
+		$page = $this->getInstalledPage();
+		$this->message(sprintf($this->_('Installed to %s'), $page->path)); 
+		if($page->parent->name == 'setup') $this->message($this->_('Click to your "Setup" page to start using this module.')); 
+	}
+
+	/**
+	 * Return the page that this Process is installed on 
+	 * 
+	 * @return Page
+	 *
+	 */
+	protected function getInstalledPage() {
+
+		$admin = $this->pages->get($this->config->adminRootPageID); 
+		$parent = $admin->child("name=setup"); 
+		if(!$parent->id) $parent = $admin;
+		$page = $parent->child("name=" . self::adminPageName); 
+
+		if(!$page->id) { 	
+			$page = new Page();
+			$page->parent = $parent; 
+			$page->template = $this->templates->get('admin');
+			$page->name = self::adminPageName; 
+			$page->title = $this->_x('Forms', 'created-page-title'); // Title of created page
+			$page->process = $this; 
+			$page->sort = $parent->numChildren;
+			$page->save();
+		}
+
+		return $page; 	
+	}
+
+	/**
+	 * Uninstall the module
+	 *
+	 */
+	public function ___uninstall() {
+		$page = $this->getInstalledPage();	
+		if($page->id) { 
+			$this->message(sprintf($this->_('Removed %s'), $page->path));
+			$this->pages->delete($page); 
+		}
+	}
+}
+
+
